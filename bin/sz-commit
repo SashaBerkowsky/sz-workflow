@@ -29,7 +29,9 @@
 #   PATH  repo-root-relative files (as `git status --porcelain` prints them).
 #         Whole files only: there is deliberately no way to stage hunks.
 #
-# Per-repo config (stored in .git/config, nothing is written to the work tree):
+# Per-repo config (stored in .git/config, nothing is written to the work tree;
+# the repo's path is added to ~/.config/sz-workflow/repos so setup.sh uninstall
+# can reset it):
 #   sz.scope / sz.scopePath                # written by scope-add (the /sz-commit
 #                                          # skill's one-time setup does this)
 #   sz.ticketPrefix                        # written by ticket-prefix; default: pro
@@ -51,6 +53,17 @@ nl='
 FORBIDDEN='co-authored-by:.*(claude|anthropic|openai|codex|copilot|cursor|gemini|aider)|noreply@anthropic\.com|generated (with|by) .*(claude|codex|copilot|cursor|gemini|aider)|^claude-session:|claude\.(ai|com)/code'
 
 in_repo() { git rev-parse --show-toplevel >/dev/null 2>&1 || die "not inside a git work tree"; }
+
+# remember_repo: add this repo to the list `setup.sh uninstall` resets. Called
+# by every subcommand that writes sz.* or a hook. Same path as in setup.sh.
+remember_repo() {
+  f=${XDG_CONFIG_HOME:-$HOME/.config}/sz-workflow/repos
+  top=$(git rev-parse --show-toplevel)
+  case $top in *"$nl"*) return 0 ;; esac
+  if [ -f "$f" ] && grep -Fqx -- "$top" "$f"; then return 0; fi
+  mkdir -p "$(dirname "$f")"
+  printf '%s\n' "$top" >> "$f"
+}
 
 types() {
   t=$(git config --get-all sz.type 2>/dev/null || true)
@@ -182,6 +195,7 @@ command -v sz-commit >/dev/null 2>&1 || PATH="$HOME/.local/bin:$PATH"
 exec sz-commit lint-msg "$1"
 EOF
   chmod +x "$dst"
+  remember_repo
   printf 'wrote %s\n' "$dst"
 }
 
@@ -201,6 +215,7 @@ cmd_scope_add() {
     in_list "$entry" "$(scope_map)" || git config --add sz.scopePath "$entry"
   done
   in_list "$name" "$(scopes)" || git config --add sz.scope "$name"
+  remember_repo
   printf 'scope %s: %s\n' "$name" "${*:-(no paths)}"
 }
 
@@ -225,6 +240,7 @@ cmd_ticket_prefix() {
   printf '%s\n' "$p" | grep -Eqx '[a-z][a-z0-9]*' \
     || die "prefix '$1' may only contain letters and digits, starting with a letter"
   git config sz.ticketPrefix "$p"
+  remember_repo
   printf 'ticket prefix: %s (branches [c<N>/]%s-<n> get Refs: %s-<n>)\n' "$p" "$p" "$(printf '%s' "$p" | tr '[:lower:]' '[:upper:]')"
 }
 

@@ -65,7 +65,9 @@ POSIX `sh`, with only POSIX options of `sed`, `grep`, `tr`, `sort` and
 ### Configuration
 
 All settings live in the clone's `.git/config`; nothing is written to the
-work tree.
+work tree. Whenever `scope-add`, `ticket-prefix` or `install-hook` saves
+something, the repo's path is added to `~/.config/sz-workflow/repos` (or
+under `$XDG_CONFIG_HOME`), so `setup.sh uninstall` can reset it later.
 
 | Key | Written by | Default | Meaning |
 |---|---|---|---|
