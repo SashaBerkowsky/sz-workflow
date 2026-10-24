@@ -1,0 +1,18 @@
+{
+  "attribution": { "commit": "", "pr": "" },
+  "permissions": {
+    "allow": [
+      "Bash(sz-commit config)",
+      "Bash(sz-commit check *)",
+      "Bash(sz-commit summary *)",
+      "Bash(sz-commit scope-of *)"
+    ],
+    "ask": [
+      "Bash(sz-commit apply *)"
+    ],
+    "deny": [
+      "Bash(git commit *)",
+      "Bash(git add *)"
+    ]
+  }
+}
