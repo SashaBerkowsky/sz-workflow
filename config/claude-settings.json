@@ -7,12 +7,16 @@
       "Bash(sz-commit summary *)",
       "Bash(sz-commit scope-of *)",
       "Bash(sz-branch find *)",
-      "Bash(sz-branch check *)"
+      "Bash(sz-branch check *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr list *)"
     ],
     "ask": [
       "Bash(sz-commit apply *)",
       "Bash(sz-commit undo *)",
-      "Bash(sz-branch switch *)"
+      "Bash(sz-branch switch *)",
+      "Bash(git push -u origin *)",
+      "Bash(gh pr create *)"
     ],
     "deny": [
       "Bash(git commit *)",
