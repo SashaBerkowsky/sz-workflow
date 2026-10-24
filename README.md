@@ -18,7 +18,8 @@ sz-workflow/
 ├── skills/                     # one copy each, used by Claude Code and Codex
 │   ├── sz-commit/SKILL.md      # group changes into commits (calls bin/sz-commit)
 │   ├── sz-work/SKILL.md        # get onto a Linear ticket's branch (calls bin/sz-branch)
-│   └── sz-new/SKILL.md         # turn a bug you saw into a Linear ticket
+│   ├── sz-new/SKILL.md         # turn a bug you saw into a Linear ticket
+│   └── sz-pr/SKILL.md          # open a PR for the current ticket's branch
 └── config/
     └── claude-settings.json    # merge by hand into ~/.claude/settings.json
 ```
@@ -197,11 +198,41 @@ sz-branch check -c 12 -f c12/pro-2 PRO-3     # what switch would do
 sz-branch switch -c 12 -f c12/pro-2 PRO-3    # create c12/pro-3 from c12/pro-2
 ```
 
+## Pull requests
+
+`/sz-pr` opens a PR for the branch you are on, after you approve the exact
+`git push` and `gh pr create` commands. It needs the GitHub CLI (`gh`),
+logged in.
+
+- **Base:** the branch the work was built on. If the ticket depends on
+  another ticket whose PR is still open, the PR is stacked on that branch;
+  otherwise it targets the default branch.
+- **Title:** `type(scope): subject`, like the commits. The scope comes from
+  `sz-commit scope-of` when the files share one; otherwise the skill picks
+  one and says why.
+- **Description:** follows the repo's PR template if there is one
+  (`pull_request_template.md` in the root, `docs/` or `.github/`, or a
+  `PULL_REQUEST_TEMPLATE/` folder), otherwise a Summary / Changes / Notes
+  shape, and ends with `Refs: <ticket>` linked to the ticket's Linear page.
+- **Context:** the session, the commits and the Linear ticket, plus any
+  notes or plans in the repo, tracked or gitignored, that mention the
+  ticket, its parent or its sub-issues. It tells you which it used, or that
+  it found none.
+
+It stops if the branch already has a PR, and never force-pushes. It opens a
+draft only when you ask for one. Once a ready-for-review PR is open, it
+moves the ticket to In Review in Linear (part of what you approve); a draft
+leaves the ticket as it is. If Linear's GitHub integration hasn't linked the
+PR to the ticket within about 30 seconds, it adds the link itself, so
+there is never a duplicate when the integration is on.
+
 ## AI attribution guard, in layers
 
 1. `config/claude-settings.json` sets `attribution` to empty strings, so
    Claude Code does not add its co-author trailer or PR footer.
-   **Claude Code only.** The portable guards are the next two.
+   **Claude Code only.** The portable guards are the next two. For PRs,
+   the only other guard is the `/sz-pr` skill's own rule: no script checks
+   a PR's title or description.
 2. `sz-commit` rejects messages containing AI attribution. The skill commits
    only through it, and the settings snippet denies `git add` / `git commit`
    to Claude Code. Claude Code's docs say Bash deny rules are not a security
