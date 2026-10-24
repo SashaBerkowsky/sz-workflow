@@ -1,0 +1,358 @@
+#!/bin/sh
+# sz-commit: validated, whole-file commits in the form type(scope): subject.
+#
+# POSIX sh (no bash needed). Uses only POSIX options of sed/grep/tr/sort, so it
+# behaves the same with GNU (Linux) and BSD (macOS) userland. Lint: shellcheck.
+#
+# Usage:
+#   sz-commit config
+#   sz-commit check -t TYPE -s SCOPE -m SUBJECT [-b PARAGRAPH]... [-B] [-r ID | -R] -- PATH...
+#   sz-commit apply -t TYPE -s SCOPE -m SUBJECT [-b PARAGRAPH]... [-B] [-r ID | -R] -- PATH...
+#   sz-commit lint-msg FILE
+#   sz-commit install-hook
+#   sz-commit summary [N]   last N commits (default 1), oldest first, files as a tree
+#   sz-commit scope-add NAME [PATH...]   allow scope NAME; files under PATH belong to it
+#   sz-commit scope-of PATH...           print the scope each file belongs to ("-" if none)
+#   sz-commit scope-reset                forget all scopes for this repo
+#
+#   -t  conventional commit type (from sz.type, or the default list)
+#   -s  scope; must be one of sz.scope. If the files all belong (by sz.scopePath)
+#       to one other scope, the commit is rejected
+#   -m  subject; one line, no trailing period
+#   -b  body paragraph (repeatable); use it for the *why*, not the what
+#   -B  breaking change (adds "!" after the scope)
+#   -r  ticket id for the Refs trailer, overriding the one parsed from the branch
+#   -R  no Refs trailer
+#   PATH  repo-root-relative files (as `git status --porcelain` prints them).
+#         Whole files only: there is deliberately no way to stage hunks.
+#
+# Per-repo config (stored in .git/config, nothing is written to the work tree):
+#   sz.scope / sz.scopePath                # written by scope-add (the commit-plan
+#                                          # skill's one-time setup does this)
+#   git config sz.ticketPrefix pro         # default: pro
+#   git config sz.headerMax 72             # default: 72
+#   git config --add sz.type feat          # only if you want to replace the default type list
+
+set -eu
+
+PROG=sz-commit
+DEFAULT_TYPES='build chore ci docs feat fix perf refactor revert style test'
+
+die() { printf '%s: %s\n' "$PROG" "$*" >&2; exit 1; }
+warn() { printf '%s: %s\n' "$PROG" "$*" >&2; }
+nl='
+'
+
+# Patterns that must never appear in a commit message (case-insensitive ERE).
+# Covers the trailers and footers AI coding tools add by default.
+FORBIDDEN='co-authored-by:.*(claude|anthropic|openai|codex|copilot|cursor|gemini|aider)|noreply@anthropic\.com|generated (with|by) .*(claude|codex|copilot|cursor|gemini|aider)|^claude-session:|claude\.(ai|com)/code'
+
+in_repo() { git rev-parse --show-toplevel >/dev/null 2>&1 || die "not inside a git work tree"; }
+
+types() {
+  t=$(git config --get-all sz.type 2>/dev/null || true)
+  if [ -n "$t" ]; then
+    printf '%s\n' "$t"
+  else
+    # shellcheck disable=SC2086 # word splitting is the point here
+    printf '%s\n' $DEFAULT_TYPES
+  fi
+}
+
+scopes() { git config --get-all sz.scope 2>/dev/null || true; }
+scope_map() { git config --get-all sz.scopePath 2>/dev/null || true; }
+
+# Print "scope<TAB>path" for each path: the longest sz.scopePath prefix wins.
+# A mapped directory ends in "/"; a mapped file must match exactly.
+scope_of_all() {
+  map=$(scope_map)
+  for f in "$@"; do
+    best=- bestlen=0
+    if [ -n "$map" ]; then
+      while IFS= read -r line; do
+        name=${line%% *} p=${line#* }
+        case $p in
+          */) case $f in "$p"*) ;; *) continue ;; esac ;;
+          *) [ "$f" = "$p" ] || continue ;;
+        esac
+        if [ "${#p}" -gt "$bestlen" ]; then best=$name bestlen=${#p}; fi
+      done <<EOF
+$map
+EOF
+    fi
+    printf '%s\t%s\n' "$best" "$f"
+  done
+}
+
+ticket_prefix() { git config --get sz.ticketPrefix 2>/dev/null || echo pro; }
+
+header_max() {
+  m=$(git config --get sz.headerMax 2>/dev/null || echo 72)
+  case $m in ''|*[!0-9]*) die "sz.headerMax must be a number" ;; esac
+  echo "$m"
+}
+
+# in_list WORD LIST(newline-separated)
+in_list() {
+  case "$nl$2$nl" in *"$nl$1$nl"*) return 0 ;; esac
+  return 1
+}
+
+# Ticket id from the branch: [c<N>/]<prefix>-<n>[-anything] -> PREFIX-n
+branch_ticket() {
+  b=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+  p=$(ticket_prefix)
+  printf '%s\n' "$b" | sed -n "s#^\(c[0-9][0-9]*/\)\{0,1\}\($p-[0-9][0-9]*\)\(-.*\)\{0,1\}\$#\2#p" | tr '[:lower:]' '[:upper:]'
+}
+
+check_forbidden() {
+  if printf '%s\n' "$1" | grep -Eiq "$FORBIDDEN"; then
+    die "message contains AI attribution (co-author trailer, 'Generated with' footer or session link); remove it"
+  fi
+}
+
+check_header() {
+  h=$1
+  max=$(header_max)
+  [ "${#h}" -le "$max" ] || die "header is ${#h} chars, max $max: $h"
+  # type(scope)!: subject
+  t=${h%%(*}
+  case $h in
+    "$t("*"): "* | "$t("*")!: "*) ;;
+    *) die "header must look like type(scope): subject, got: $h" ;;
+  esac
+  rest=${h#*\(}
+  s=${rest%%\)*}
+  subj=${h#*: }
+  in_list "$t" "$(types)" || die "type '$t' not allowed; allowed: $(types | tr '\n' ' ')"
+  sc=$(scopes)
+  [ -n "$sc" ] || die "no scopes configured for this repo; run the commit-plan skill's setup, or: $PROG scope-add <name> [path...]"
+  in_list "$s" "$sc" || die "scope '$s' not allowed; allowed: $(printf '%s' "$sc" | tr '\n' ' ')"
+  case $subj in
+    '' | ' '*) die "subject is empty or starts with a space" ;;
+    *.) die "subject must not end with a period" ;;
+  esac
+}
+
+# ---- subcommands -----------------------------------------------------------
+
+cmd_config() {
+  in_repo
+  printf 'types:   %s\n' "$(types | tr '\n' ' ')"
+  printf 'scopes:  %s\n' "$(scopes | tr '\n' ' ')"
+  printf 'branch:  %s\n' "$(git symbolic-ref --quiet --short HEAD 2>/dev/null || echo '(detached)')"
+  printf 'ticket:  %s\n' "$(branch_ticket)"
+  printf 'max:     %s\n' "$(header_max)"
+  scope_map | sed 's/^\([^ ]*\) /path:    \1 <- /'
+}
+
+cmd_lint_msg() {
+  [ $# -eq 1 ] || die "usage: $PROG lint-msg FILE"
+  # Drop comment lines the way git's default cleanup does.
+  msg=$(grep -v '^#' "$1" || true)
+  check_forbidden "$msg"
+  h=$(printf '%s\n' "$msg" | sed -n '/./{p;q;}')
+  case $h in
+    'Merge '* | 'Revert "'* | 'fixup! '* | 'squash! '* | 'amend! '*) return 0 ;;
+  esac
+  check_header "$h"
+}
+
+cmd_install_hook() {
+  in_repo
+  hp=$(git config --get core.hooksPath 2>/dev/null || true)
+  if [ -n "$hp" ]; then
+    die "this repo sets core.hooksPath=$hp (husky or similar), so .git/hooks is ignored; not installing. sz-commit still validates its own commits."
+  fi
+  dst=$(git rev-parse --git-path hooks/commit-msg)
+  if [ -e "$dst" ] || [ -L "$dst" ]; then
+    die "$dst already exists; not overwriting"
+  fi
+  mkdir -p "$(dirname "$dst")"
+  # The hook only delegates to sz-commit, so it never goes stale. It fails
+  # closed: if sz-commit cannot be found, the commit is rejected.
+  cat > "$dst" <<'EOF'
+#!/bin/sh
+# commit-msg hook written by `sz-commit install-hook`.
+command -v sz-commit >/dev/null 2>&1 || PATH="$HOME/.local/bin:$PATH"
+exec sz-commit lint-msg "$1"
+EOF
+  chmod +x "$dst"
+  printf 'wrote %s\n' "$dst"
+}
+
+cmd_scope_add() {
+  in_repo
+  [ $# -ge 1 ] || die "usage: $PROG scope-add NAME [PATH...]"
+  name=$1; shift
+  printf '%s\n' "$name" | grep -Eqx '[A-Za-z0-9][A-Za-z0-9._-]*' \
+    || die "scope '$name' may only contain letters, digits, . _ -"
+  cd "$(git rev-parse --show-toplevel)"
+  for p in "$@"; do
+    p=${p#./}
+    case $p in ''|/*|*..*|*"$nl"*) die "path '$p' must be a relative path inside the repo" ;; esac
+    [ -e "$p" ] || die "'$p' does not exist (paths are relative to the repo root)"
+    if [ -d "$p" ]; then p=${p%/}/; fi
+    entry="$name $p"
+    in_list "$entry" "$(scope_map)" || git config --add sz.scopePath "$entry"
+  done
+  in_list "$name" "$(scopes)" || git config --add sz.scope "$name"
+  printf 'scope %s: %s\n' "$name" "${*:-(no paths)}"
+}
+
+cmd_scope_of() {
+  in_repo
+  [ $# -ge 1 ] || die "usage: $PROG scope-of PATH..."
+  cd "$(git rev-parse --show-toplevel)"
+  scope_of_all "$@"
+}
+
+cmd_scope_reset() {
+  in_repo
+  git config --unset-all sz.scope 2>/dev/null || true
+  git config --unset-all sz.scopePath 2>/dev/null || true
+  echo "scopes cleared"
+}
+
+cmd_summary() {
+  in_repo
+  n=${1:-1}
+  case $n in ''|*[!0-9]*|0) die "usage: $PROG summary [N]" ;; esac
+  first=1
+  for c in $(git rev-list -n "$n" --reverse HEAD); do
+    [ -n "$first" ] || echo
+    first=''
+    git log -1 --format='%h %s' "$c"
+    git -c core.quotePath=false diff-tree --no-commit-id -r --root --no-renames --name-status "$c" |
+      awk -F '\t' '
+        {
+          n = split($2, part, "/"); parent = ""
+          for (i = 1; i <= n; i++) {
+            node = (parent == "") ? part[i] : parent "/" part[i]
+            if (!(node in seen)) {
+              seen[node] = 1; nc[parent]++; child[parent, nc[parent]] = node; name[node] = part[i]
+            }
+            parent = node
+          }
+          if ($1 == "A") tag[$2] = " (new)"; else if ($1 == "D") tag[$2] = " (deleted)"
+        }
+        function walk(node, prefix,    i, c, last) {
+          for (i = 1; i <= nc[node]; i++) {
+            c = child[node, i]; last = (i == nc[node])
+            print prefix (last ? "└── " : "├── ") name[c] tag[c]
+            if (nc[c]) walk(c, prefix (last ? "    " : "│   "))
+          }
+        }
+        END { walk("", "") }'
+  done
+}
+
+cmd_commit() {
+  mode=$1; shift
+  in_repo
+  type='' scope='' subject='' body='' breaking='' ref='' noref=''
+  while getopts 't:s:m:b:Br:R' opt; do
+    case $opt in
+      t) type=$OPTARG ;;
+      s) scope=$OPTARG ;;
+      m) subject=$OPTARG ;;
+      b) body=${body:+$body$nl$nl}$OPTARG ;;
+      B) breaking='!' ;;
+      r) ref=$OPTARG ;;
+      R) noref=1 ;;
+      *) die "unknown option; see the usage at the top of $0" ;;
+    esac
+  done
+  shift $((OPTIND - 1))
+  [ "${1:-}" = "--" ] && shift
+  if [ -z "$type" ] || [ -z "$scope" ] || [ -z "$subject" ]; then die "-t, -s and -m are required"; fi
+  [ $# -gt 0 ] || die "no paths given (list files after --)"
+  case $subject in *"$nl"*) die "subject must be a single line" ;; esac
+
+  header="$type($scope)$breaking: $subject"
+  check_header "$header"
+
+  if [ -z "$noref" ]; then
+    [ -n "$ref" ] || ref=$(branch_ticket)
+    if [ -n "$ref" ]; then
+      p=$(ticket_prefix | tr '[:lower:]' '[:upper:]')
+      ref=$(printf '%s' "$ref" | tr '[:lower:]' '[:upper:]')
+      printf '%s\n' "$ref" | grep -Eqx "$p-[0-9]+" || die "ticket id '$ref' is not $p-<number>"
+    else
+      warn "branch does not match [c<N>/]$(ticket_prefix)-<n>; committing without a Refs trailer"
+    fi
+  else
+    ref=''
+  fi
+
+  msg=$header
+  [ -n "$body" ] && msg="$msg$nl$nl$body"
+  [ -n "$ref" ] && msg="$msg$nl${nl}Refs: $ref"
+  check_forbidden "$msg"
+
+  cd "$(git rev-parse --show-toplevel)"
+  # Paths are literal file names, never globs or pathspec magic.
+  GIT_LITERAL_PATHSPECS=1; export GIT_LITERAL_PATHSPECS
+
+  for f in "$@"; do
+    case $f in *"$nl"*) die "path contains a newline" ;; esac
+    [ -d "$f" ] && [ ! -L "$f" ] && die "'$f' is a directory; list the files it contains"
+    [ -n "$(git status --porcelain --untracked-files=all -- "$f")" ] \
+      || die "'$f' has no changes (or is ignored); paths are relative to the repo root"
+  done
+
+  if [ -n "$(scope_map)" ]; then
+    owners=$(scope_of_all "$@" | cut -f1 | sort -u)
+    case $owners in
+      "$scope" | -) ;;
+      *"$nl"*) warn "these files span several scopes: $(printf '%s' "$owners" | tr '\n' ' ')" ;;
+      *) die "these files belong to scope '$owners', not '$scope'" ;;
+    esac
+  fi
+
+  git diff --cached --quiet \
+    || die "the index already has staged changes; sz-commit stages whole files itself. Unstage first: git restore --staged ."
+
+  if [ "$mode" = check ]; then
+    printf 'ok: %s (%s file(s))\n' "$header" "$#"
+    [ -n "$ref" ] && printf '    Refs: %s\n' "$ref"
+    return 0
+  fi
+
+  git add -A -- "$@"
+  # Exactly what was asked must be staged, nothing more.
+  staged=$(git diff --cached --name-only --no-renames | sort)
+  wanted=$(printf '%s\n' "$@" | sort -u)
+  if [ "$staged" != "$wanted" ]; then
+    unstage "$@"
+    die "staged set differs from the requested paths; nothing committed"
+  fi
+
+  # No --no-verify: repo hooks (husky lint/test) run and may reject the commit.
+  if printf '%s\n' "$msg" | git commit --quiet -F -; then
+    git log -1 --format='committed %h %s'
+  else
+    unstage "$@"
+    die "commit rejected (see hook output above); files unstaged, working tree untouched"
+  fi
+}
+
+unstage() {
+  if git rev-parse --verify --quiet HEAD >/dev/null; then
+    git reset --quiet HEAD -- "$@"
+  else
+    git rm --cached --quiet --ignore-unmatch -r -- "$@"
+  fi
+}
+
+case ${1:-} in
+  config) shift; cmd_config "$@" ;;
+  check | apply) cmd_commit "$@" ;;
+  lint-msg) shift; cmd_lint_msg "$@" ;;
+  install-hook) shift; cmd_install_hook "$@" ;;
+  summary) shift; cmd_summary "$@" ;;
+  scope-add) shift; cmd_scope_add "$@" ;;
+  scope-of) shift; cmd_scope_of "$@" ;;
+  scope-reset) shift; cmd_scope_reset "$@" ;;
+  *) awk 'NR > 1 && !/^#/ { exit } NR > 1 { sub(/^# ?/, ""); print }' "$0" >&2; exit 2 ;;
+esac
