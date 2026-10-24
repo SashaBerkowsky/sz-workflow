@@ -30,7 +30,7 @@
 #         Whole files only: there is deliberately no way to stage hunks.
 #
 # Per-repo config (stored in .git/config, nothing is written to the work tree):
-#   sz.scope / sz.scopePath                # written by scope-add (the commit-plan
+#   sz.scope / sz.scopePath                # written by scope-add (the /sz-commit
 #                                          # skill's one-time setup does this)
 #   sz.ticketPrefix                        # written by ticket-prefix; default: pro
 #   git config sz.headerMax 72             # default: 72
@@ -129,7 +129,7 @@ check_header() {
   subj=${h#*: }
   in_list "$t" "$(types)" || die "type '$t' not allowed; allowed: $(types | tr '\n' ' ')"
   sc=$(scopes)
-  [ -n "$sc" ] || die "no scopes configured for this repo; run the commit-plan skill's setup, or: $PROG scope-add <name> [path...]"
+  [ -n "$sc" ] || die "no scopes configured for this repo; run the /sz-commit skill's setup, or: $PROG scope-add <name> [path...]"
   in_list "$s" "$sc" || die "scope '$s' not allowed; allowed: $(printf '%s' "$sc" | tr '\n' ' ')"
   case $subj in
     '' | ' '*) die "subject is empty or starts with a space" ;;

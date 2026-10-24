@@ -45,7 +45,7 @@ Run with no arguments (or an unknown subcommand) to print the usage.
 
 ### Description
 
-`sz-commit` is the only way the `commit-plan` skill commits. The agent passes
+`sz-commit` is the only way the `/sz-commit` skill commits. The agent passes
 the variable parts (type, scope, subject, why, files); the script checks them
 and does all staging and committing itself. That way the rules hold even when
 the prompt is ignored:

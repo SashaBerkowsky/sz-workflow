@@ -1,5 +1,5 @@
 ---
-name: commit-plan
+name: sz-commit
 description: Split the current uncommitted changes into whole-file conventional commits, validate them and commit them with sz-commit. Use only when the user asks for a commit plan.
 disable-model-invocation: true
 ---
@@ -48,6 +48,10 @@ repo uses (`pro`, `sza`, ...) and save their answer with
 If `ticket:` is empty, ask the user once for the whole plan whether to
 reference a ticket. If they give one, pass `-r PREFIX-<n>` on every commit;
 if not, pass `-R` on every commit. Never guess a ticket number.
+
+This skill never changes branches. If the user wants these commits on a
+ticket's own branch rather than the current one, stop and suggest the
+`sz-work` skill first.
 
 If `git diff --cached --stat` shows staged changes, stop and ask the user
 whether to unstage them; `sz-commit` refuses to run on a dirty index.
