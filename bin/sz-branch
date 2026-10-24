@@ -1,0 +1,166 @@
+#!/bin/sh
+# sz-branch: find, create or switch to the branch for a ticket ([c<N>/]<prefix>-<n>).
+#
+# POSIX sh (no bash needed). Uses only POSIX options of sed/grep/tr, so it
+# behaves the same with GNU (Linux) and BSD (macOS) userland. Lint: shellcheck.
+#
+# Usage:
+#   sz-branch find TICKET                          list branches for TICKET
+#   sz-branch check  [-c CYCLE] [-f FROM] TICKET   say what switch would do, change nothing
+#   sz-branch switch [-c CYCLE] [-f FROM] TICKET   switch to TICKET's branch, creating it if needed
+#
+#   TICKET  <PREFIX>-<n> for the prefix saved with `sz-commit ticket-prefix` (any case)
+#   -c      cycle number; a new branch is named c<CYCLE>/<prefix>-<n>
+#   -f      branch or commit to create the new branch from (default: where you are now).
+#           Refused when the ticket's branch already exists.
+#
+# It only runs plain `git switch`: uncommitted changes come along, and git
+# refuses instead of overwriting them. It never stashes, resets or deletes.
+#
+# Per-repo config (in .git/config): sz.ticketPrefix, shared with sz-commit. There is
+# no default here: with no prefix saved it refuses and says how to set one.
+
+set -eu
+
+PROG=sz-branch
+
+die() { printf '%s: %s\n' "$PROG" "$*" >&2; exit 1; }
+nl='
+'
+
+in_repo() { git rev-parse --show-toplevel >/dev/null 2>&1 || die "not inside a git work tree"; }
+
+prefix() {
+  p=$(git config --get sz.ticketPrefix 2>/dev/null || true)
+  [ -n "$p" ] || die "no ticket prefix saved for this repo; ask which one it uses, then: sz-commit ticket-prefix PREFIX"
+  printf '%s\n' "$p"
+}
+
+# ticket_number TICKET -> n, or die. Callers add `|| exit 1`: bash does not
+# apply set -e inside $(...), so a die in there would not stop the script.
+ticket_number() {
+  p=$(prefix) || exit 1
+  t=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+  case $t in *"$nl"*) die "ticket must be a single line" ;; esac
+  printf '%s\n' "$t" | grep -Eqx "$p-[0-9]+" \
+    || die "ticket '$1' is not $(printf '%s' "$p" | tr '[:lower:]' '[:upper:]')-<number>"
+  printf '%s\n' "${t#"$p"-}"
+}
+
+current_branch() { git symbolic-ref --quiet --short HEAD 2>/dev/null || true; }
+
+# local_matches N / remote_matches N: branch names for ticket N, one per line.
+# A branch matches [c<N>/]<prefix>-<n>[-anything].
+pattern() { printf '^(c[0-9]+/)?%s-%s(-.*)?$' "$(prefix)" "$1"; }
+
+local_matches() {
+  git for-each-ref --format='%(refname:short)' refs/heads | grep -E "$(pattern "$1")" || true
+}
+
+# Remote-tracking branches, printed as remote/name; HEAD aliases skipped.
+remote_matches() {
+  pat=$(pattern "$1")
+  git for-each-ref --format='%(refname:short)' refs/remotes | while IFS= read -r r; do
+    case $r in */HEAD) continue ;; esac
+    printf '%s\n' "${r#*/}" | grep -Eq "$pat" && printf '%s\n' "$r"
+  done
+  return 0
+}
+
+count() { if [ -z "$1" ]; then echo 0; else printf '%s\n' "$1" | wc -l | tr -d ' '; fi; }
+
+cmd_find() {
+  in_repo
+  [ $# -eq 1 ] || die "usage: $PROG find TICKET"
+  n=$(ticket_number "$1") || exit 1
+  local_matches "$n" | sed 's/^/local   /'
+  remote_matches "$n" | sed 's/^/remote  /'
+}
+
+cmd_switch() {
+  mode=$1; shift
+  in_repo
+  cycle='' from=''
+  while getopts 'c:f:' opt; do
+    case $opt in
+      c) cycle=$OPTARG ;;
+      f) from=$OPTARG ;;
+      *) die "usage: $PROG $mode [-c CYCLE] [-f FROM] TICKET" ;;
+    esac
+  done
+  shift $((OPTIND - 1))
+  [ $# -eq 1 ] || die "usage: $PROG $mode [-c CYCLE] [-f FROM] TICKET"
+  n=$(ticket_number "$1") || exit 1
+  case $cycle in *[!0-9]*) die "cycle must be a number, got '$cycle'" ;; esac
+  cur=$(current_branch)
+  dirty=''
+  [ -z "$(git status --porcelain)" ] || dirty=1
+
+  locals=$(local_matches "$n")
+  case $(count "$locals") in
+    0) ;;
+    1)
+      [ -z "$from" ] || die "branch '$locals' already exists; -f only applies when creating one"
+      if [ "$locals" = "$cur" ]; then
+        printf 'already on %s\n' "$cur"
+        return 0
+      fi
+      if [ "$mode" = check ]; then
+        printf 'ok: would switch to existing branch %s\n' "$locals"
+        [ -z "$dirty" ] || printf '    uncommitted changes would come along\n'
+        return 0
+      fi
+      git switch --quiet "$locals" || die "git refused to switch (see above); nothing changed"
+      printf 'switched to %s\n' "$locals"
+      return 0
+      ;;
+    *) die "several branches for this ticket; switch to one yourself: $(printf '%s' "$locals" | tr '\n' ' ')" ;;
+  esac
+
+  remotes=$(remote_matches "$n")
+  case $(count "$remotes") in
+    0) ;;
+    1)
+      [ -z "$from" ] || die "branch '$remotes' already exists on the remote; -f only applies when creating one"
+      if [ "$mode" = check ]; then
+        printf 'ok: would create %s tracking %s\n' "${remotes#*/}" "$remotes"
+        [ -z "$dirty" ] || printf '    uncommitted changes would come along\n'
+        return 0
+      fi
+      git switch --quiet --track "$remotes" || die "git refused to switch (see above); nothing changed"
+      printf 'switched to %s, tracking %s\n' "${remotes#*/}" "$remotes"
+      return 0
+      ;;
+    *) die "several remote branches for this ticket: $(printf '%s' "$remotes" | tr '\n' ' ')" ;;
+  esac
+
+  name="$(prefix)-$n"
+  [ -z "$cycle" ] || name="c$cycle/$name"
+  git check-ref-format --branch "$name" >/dev/null 2>&1 || die "'$name' is not a valid branch name"
+  if [ -n "$from" ]; then
+    case $from in -*|*"$nl"*) die "-f must name a branch or commit, got '$from'" ;; esac
+    git rev-parse --verify --quiet "$from^{commit}" >/dev/null || die "-f '$from' is not a branch or commit"
+    base=$from
+  else
+    git rev-parse --verify --quiet HEAD >/dev/null || die "no commits yet; make one before branching"
+    base=${cur:-HEAD}
+  fi
+
+  if [ "$mode" = check ]; then
+    printf 'ok: would create %s from %s (%s)\n' "$name" "$base" "$(git log -1 --format='%h %s' "$base")"
+    [ -z "$dirty" ] || printf '    uncommitted changes would come along\n'
+    return 0
+  fi
+  if [ -n "$from" ]; then
+    git switch --quiet -c "$name" "$from" || die "git refused to create the branch (see above); nothing changed"
+  else
+    git switch --quiet -c "$name" || die "git refused to create the branch (see above); nothing changed"
+  fi
+  printf 'created %s from %s and switched to it\n' "$name" "$base"
+}
+
+case ${1:-} in
+  find) shift; cmd_find "$@" ;;
+  check | switch) cmd_switch "$@" ;;
+  *) awk 'NR > 1 && !/^#/ { exit } NR > 1 { sub(/^# ?/, ""); print }' "$0" >&2; exit 2 ;;
+esac
