@@ -5,11 +5,14 @@
       "Bash(sz-commit config)",
       "Bash(sz-commit check *)",
       "Bash(sz-commit summary *)",
-      "Bash(sz-commit scope-of *)"
+      "Bash(sz-commit scope-of *)",
+      "Bash(sz-branch find *)",
+      "Bash(sz-branch check *)"
     ],
     "ask": [
       "Bash(sz-commit apply *)",
-      "Bash(sz-commit undo *)"
+      "Bash(sz-commit undo *)",
+      "Bash(sz-branch switch *)"
     ],
     "deny": [
       "Bash(git commit *)",
