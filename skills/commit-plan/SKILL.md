@@ -1,20 +1,22 @@
 ---
 name: commit-plan
-description: Split the current uncommitted changes into a reviewed plan of whole-file conventional commits, then run it with sz-commit. Use only when the user asks for a commit plan.
+description: Split the current uncommitted changes into whole-file conventional commits, validate them and commit them with sz-commit. Use only when the user asks for a commit plan.
 disable-model-invocation: true
 ---
 
 # Commit plan
 
-Turn the working tree's changes into a short list of commits the user reviews
-before anything is committed. You decide the grouping and the wording; the
-`sz-commit` script decides whether they are valid and does all staging and
-committing.
+Turn the working tree's changes into a short list of commits and commit them.
+You decide the grouping and the wording; the `sz-commit` script decides
+whether they are valid and does all staging and committing. The user reviews
+the result afterwards, in the summary tree; commits stay local, so nothing
+here is outward-facing.
 
 ## Rules
 
-- Commit only through `sz-commit apply`. Never run `git add`, `git commit`,
-  `git reset` or `git stash` yourself, and never pass `--no-verify`.
+- Commit only through `sz-commit apply`, and uncommit only through
+  `sz-commit undo`. Never run `git add`, `git commit`, `git reset` or
+  `git stash` yourself, and never pass `--no-verify`.
 - Whole files only. If one file mixes two concerns, keep it whole, put it in
   the commit of its main concern and say so in the plan.
 - Never add a `Co-authored-by` trailer, a "Generated with" footer or any other
@@ -34,9 +36,18 @@ git diff --cached --stat
 ```
 
 `config` lists the allowed types, the scopes for this repo with the paths
-mapped to them, and the ticket parsed from the branch. If no scopes are
-configured, read `setup.md` next to this file and do that one-time setup
-first, then continue here.
+mapped to them, the ticket prefix and the ticket parsed from the branch. If
+no scopes are configured, read `setup.md` next to this file and do that
+one-time setup first, then continue here.
+
+If `prefix:` says `(not set, ...)`, ask the user which ticket prefix this
+repo uses (`pro`, `sza`, ...) and save their answer with
+`sz-commit ticket-prefix PREFIX`. Do this once per clone, then run
+`sz-commit config` again.
+
+If `ticket:` is empty, ask the user once for the whole plan whether to
+reference a ticket. If they give one, pass `-r PREFIX-<n>` on every commit;
+if not, pass `-R` on every commit. Never guess a ticket number.
 
 If `git diff --cached --stat` shows staged changes, stop and ask the user
 whether to unstage them; `sz-commit` refuses to run on a dirty index.
@@ -70,41 +81,38 @@ Read untracked files before grouping them. `git diff` does not show them.
   (a constraint, a rejected alternative, a linked incident). Repeat `-b` for
   separate paragraphs. Do not describe what the diff already shows.
 - `-B` only for a breaking change to an interface other services use.
-- Leave the ticket alone; `sz-commit` adds `Refs: PRO-<n>` from the branch.
-  Pass `-r PRO-<n>` only if the user names a different ticket.
+- When the branch has a ticket, leave it alone; `sz-commit` adds
+  `Refs: PREFIX-<n>` from the branch. Pass `-r PREFIX-<n>` only if the user
+  names a different ticket. With no ticket on the branch, use what the user
+  chose in step 1.
 
 ## 4. Validate
 
 Run `sz-commit check` with exactly the arguments you plan to use, once per
 commit. Fix anything it rejects and check again. Every commit must pass
-before you show the plan.
-
-## 5. Present the plan
-
-Show a numbered list. For each commit: one line saying what it groups and why,
-then the exact command in a `sh` code block:
-
-```sh
-sz-commit apply -t feat -s api -m "validate webhook signature" -- services/api/webhook.ts services/api/webhook.test.ts
-```
+before you apply any of them.
 
 Paths are relative to the repo root, as `git status --porcelain` prints them.
 Quote any path with spaces or shell characters.
 
-End with "Not committed:" listing any changed files left out, or "none".
+## 5. Apply
 
-Then wait. The user may edit the plan (in Claude Code plan mode, Ctrl+G opens
-it in their editor). Run only what they approve, as they left it.
+Do not stop to ask for approval of the plan; go straight to applying it.
+If the user asked to review the plan first this time, show the numbered
+`sz-commit apply` commands and wait instead.
 
-## 6. Apply
+Run the `sz-commit apply` commands one per tool call, in order. On the first
+failure, stop: show the output, say which commits landed, and do nothing
+else. `sz-commit` has already unstaged the failed commit's files.
 
-Run the approved `sz-commit apply` commands one per tool call, in order. On
-the first failure, stop: show the output, say which commits landed, and
-do nothing else. `sz-commit` has already unstaged the failed commit's files.
+## 6. Report
 
-Finish by running `sz-commit summary <number of commits applied>` and
-`git status --short`, and show both outputs to the user as they are, in
-code blocks. The summary lists each commit with its files as a tree.
+Run `sz-commit summary <number of commits applied>` and `git status --short`,
+and show both outputs to the user as they are, in code blocks. The summary
+lists each commit with its files as a tree.
+
+End with "Not committed:" listing any changed files left out and why, or
+"none".
 
 ## 7. Resume after a failure
 
@@ -112,7 +120,24 @@ When the user has fixed the problem and asks to continue:
 
 1. Run `git status --porcelain --untracked-files=all`.
 2. Run `sz-commit check` for the failed commit and every commit after it.
-3. If all pass and no file outside the remaining commits changed, show the
-   remaining commands and apply them after the user approves.
+3. If all pass and no file outside the remaining commits changed, apply
+   them and report as in step 6.
 4. Otherwise (the fix touched other files, or a check fails), plan again from
    step 1 for what is left uncommitted. Commits that already landed stay.
+
+## 8. Redo the last run
+
+When the user says the last run missed something and wants the new or
+forgotten changes folded into those commits, rather than added as a new one:
+
+1. Work out N, the number of commits the last run applied: from this
+   conversation, or from `sz-commit summary` / `git log --oneline` together
+   with the user. If unsure, ask; never guess.
+2. Run `sz-commit undo --dry-run N` and check that it lists exactly the
+   last run's commits. If it refuses (pushed, merge, staged changes), stop
+   and show the message; do not work around it.
+3. Run `sz-commit undo N`. Their changes go back to the working tree,
+   uncommitted, next to the new ones. Keep the `git reset <hash>` line it
+   prints, in case the user wants the old commits back.
+4. Plan again from step 1 with everything that is now uncommitted, reusing
+   the earlier grouping and wording where it still fits, and apply as usual.

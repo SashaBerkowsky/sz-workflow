@@ -14,6 +14,9 @@
 #   sz-commit scope-add NAME [PATH...]   allow scope NAME; files under PATH belong to it
 #   sz-commit scope-of PATH...           print the scope each file belongs to ("-" if none)
 #   sz-commit scope-reset                forget all scopes for this repo
+#   sz-commit ticket-prefix PREFIX       save the ticket prefix for this repo (e.g. pro)
+#   sz-commit undo [--dry-run] N         uncommit the last N commits, keeping their changes
+#                                        in the working tree; refuses if any are pushed
 #
 #   -t  conventional commit type (from sz.type, or the default list)
 #   -s  scope; must be one of sz.scope. If the files all belong (by sz.scopePath)
@@ -29,7 +32,7 @@
 # Per-repo config (stored in .git/config, nothing is written to the work tree):
 #   sz.scope / sz.scopePath                # written by scope-add (the commit-plan
 #                                          # skill's one-time setup does this)
-#   git config sz.ticketPrefix pro         # default: pro
+#   sz.ticketPrefix                        # written by ticket-prefix; default: pro
 #   git config sz.headerMax 72             # default: 72
 #   git config --add sz.type feat          # only if you want to replace the default type list
 
@@ -140,6 +143,7 @@ cmd_config() {
   in_repo
   printf 'types:   %s\n' "$(types | tr '\n' ' ')"
   printf 'scopes:  %s\n' "$(scopes | tr '\n' ' ')"
+  printf 'prefix:  %s\n' "$(git config --get sz.ticketPrefix 2>/dev/null || echo "(not set, default $(ticket_prefix))")"
   printf 'branch:  %s\n' "$(git symbolic-ref --quiet --short HEAD 2>/dev/null || echo '(detached)')"
   printf 'ticket:  %s\n' "$(branch_ticket)"
   printf 'max:     %s\n' "$(header_max)"
@@ -212,6 +216,59 @@ cmd_scope_reset() {
   git config --unset-all sz.scope 2>/dev/null || true
   git config --unset-all sz.scopePath 2>/dev/null || true
   echo "scopes cleared"
+}
+
+cmd_ticket_prefix() {
+  in_repo
+  [ $# -eq 1 ] || die "usage: $PROG ticket-prefix PREFIX"
+  p=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+  printf '%s\n' "$p" | grep -Eqx '[a-z][a-z0-9]*' \
+    || die "prefix '$1' may only contain letters and digits, starting with a letter"
+  git config sz.ticketPrefix "$p"
+  printf 'ticket prefix: %s (branches [c<N>/]%s-<n> get Refs: %s-<n>)\n' "$p" "$p" "$(printf '%s' "$p" | tr '[:lower:]' '[:upper:]')"
+}
+
+cmd_undo() {
+  in_repo
+  dry=''
+  if [ "${1:-}" = --dry-run ]; then dry=1; shift; fi
+  [ $# -eq 1 ] || die "usage: $PROG undo [--dry-run] N"
+  n=$1
+  case $n in ''|*[!0-9]*|0*) die "N must be a positive number, got '$n'" ;; esac
+  head=$(git rev-parse --verify --quiet HEAD) || die "no commits to undo"
+  total=$(git rev-list --count --first-parent HEAD)
+  [ "$n" -le "$total" ] || die "only $total commit(s) on this branch, cannot undo $n"
+  git diff --cached --quiet \
+    || die "the index has staged changes; unstage them first so nothing gets mixed in"
+
+  commits=$(git rev-list --first-parent -n "$n" HEAD)
+  # shellcheck disable=SC2086 # one hash per word is the point here
+  if git rev-list --no-walk --parents $commits | awk 'NF > 2 { found = 1 } END { exit !found }'; then
+    die "the last $n commit(s) include a merge; undo stops before merges"
+  fi
+  # Any pushed commit in the range has the oldest one as an ancestor, so it
+  # is enough to ask whether a remote-tracking branch contains the oldest.
+  oldest=$(printf '%s\n' "$commits" | sed -n '$p')
+  remotes=$(git for-each-ref --format='%(refname:short)' --contains "$oldest" refs/remotes)
+  [ -z "$remotes" ] \
+    || die "already pushed to $(printf '%s' "$remotes" | tr '\n' ' ') (as of the last fetch); not rewriting shared history"
+
+  git log --first-parent -n "$n" --reverse --format='  %h %s' HEAD
+  if [ -n "$dry" ]; then
+    printf 'ok: would undo %s commit(s) above\n' "$n"
+    return 0
+  fi
+
+  if [ "$n" -eq "$total" ]; then
+    # Undoing the root commit: there is no HEAD~N, so drop the branch ref and
+    # empty the index; every file goes back to untracked.
+    git update-ref -d HEAD
+    git rm -r --cached --quiet -- . >/dev/null
+  else
+    git reset --quiet "HEAD~$n"
+  fi
+  printf 'undid %s commit(s); their changes are back in the working tree\n' "$n"
+  printf 'to restore them: git reset %s\n' "$(git rev-parse --short "$head")"
 }
 
 cmd_summary() {
@@ -354,5 +411,7 @@ case ${1:-} in
   scope-add) shift; cmd_scope_add "$@" ;;
   scope-of) shift; cmd_scope_of "$@" ;;
   scope-reset) shift; cmd_scope_reset "$@" ;;
+  ticket-prefix) shift; cmd_ticket_prefix "$@" ;;
+  undo) shift; cmd_undo "$@" ;;
   *) awk 'NR > 1 && !/^#/ { exit } NR > 1 { sub(/^# ?/, ""); print }' "$0" >&2; exit 2 ;;
 esac
