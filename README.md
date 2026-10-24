@@ -219,8 +219,12 @@ logged in.
   ticket, its parent or its sub-issues. It tells you which it used, or that
   it found none.
 
-It stops if the branch already has a PR, and never force-pushes. Afterwards
-it offers to move the ticket to In Review.
+It stops if the branch already has a PR, and never force-pushes. It opens a
+draft only when you ask for one. Once a ready-for-review PR is open, it
+moves the ticket to In Review in Linear (part of what you approve); a draft
+leaves the ticket as it is. If Linear's GitHub integration hasn't linked the
+PR to the ticket within about 30 seconds, it adds the link itself, so
+there is never a duplicate when the integration is on.
 
 ## AI attribution guard, in layers
 

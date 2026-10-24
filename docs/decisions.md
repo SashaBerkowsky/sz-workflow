@@ -238,6 +238,15 @@
   If none match, it uses the session, the commits and the ticket.
 - The body goes to `gh pr create --body-file -` through a quoted heredoc,
   so no temp file is written to the work tree.
+- PRs are ready for review unless the caller explicitly asks for a draft.
+  After a ready PR opens, the skill moves the ticket to In Review; the
+  approval of the commands covers that change, so it doesn't ask twice. A
+  draft leaves the ticket alone.
+- Linking the PR to the ticket is Linear's GitHub integration's job. The
+  skill links by hand only when the integration hasn't attached the PR
+  after about 30 seconds, since the MCP server can't read whether the
+  integration is set up. If the integration is slower than that, the
+  ticket gets a duplicate link; harmless, and removable in Linear.
 
 **Why**
 - Hand-written PRs didn't follow the commit standard or the repo's
