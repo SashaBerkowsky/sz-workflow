@@ -267,3 +267,28 @@
   `git push -u origin` and `gh pr create` on ask) are Claude Code only.
 - If no-attribution in PRs ever needs a hard guarantee, that is the point
   to add a script with a `check` mode after all.
+
+## 2026-10-24 · /sz-new drafts from the team's issue templates
+
+**Decided**
+- `/sz-new` lists the team's and workspace's issue templates, infers the
+  kind of ticket from what it gathered, and picks the template made for
+  it, saying why. When several fit or the kind is unclear, the user picks.
+  With no templates, or none that fits, it keeps the fixed shape.
+- Form templates are used like any other, not skipped (the owner's
+  choice). The Linear MCP server applies a form template with the form
+  unanswered, so the skill says so first and offers to create it anyway,
+  with the answers written in the description, or to use another template.
+- The filled body is passed as `description` together with `template`,
+  because a description replaces the template's body while its labels,
+  fields and sub-issues still apply.
+
+**Why**
+- Tickets should take the shape the team chose in Linear (SZA-5).
+
+**Redo on migration**
+- Uses the Linear MCP server's `list_templates`, `get_template` and the
+  `template` argument of `save_issue`; the skill names them because the
+  behaviour depends on them (body replaced, form unanswered).
+- Not tested against a real template: the SZA team has none yet. Create
+  one (and a form template) in Linear to try it.

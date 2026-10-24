@@ -188,7 +188,12 @@ Both skills use Linear through its MCP server (`linear-server`, set up by
 - `/sz-new` turns something you saw into a ticket: it looks at the code
   or error you point it to, checks for duplicates, shows you a draft and
   creates it after you approve. The team is the one matching this repo's
-  ticket prefix. It then offers to start on it.
+  ticket prefix. If the team has Linear issue templates, it picks the one
+  that fits (a bug template for a bug) and fills it, or asks you to pick
+  when it can't tell; with none, it uses a fixed shape. Form templates are
+  used too; since the Linear MCP server can't answer a form, it asks first
+  and writes the answers in the description for you to copy. It then
+  offers to start on it.
 
 `sz-branch` is usable on its own (manual: `docs/bin/sz-branch.md`):
 
