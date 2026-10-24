@@ -48,8 +48,9 @@ gh pr view --json url,state,baseRefName
 ## 2. Read the ticket
 
 With the Linear MCP server (`linear-server`), read the branch's ticket:
-title, description, parent, sub-issues, and the tickets it is **blocked
-by**. Keep the ids of the ticket, its parent and its sub-issues for step 4.
+title, description, URL, parent, sub-issues, and the tickets it is
+**blocked by**. Keep the ids of the ticket, its parent and its sub-issues
+for step 4, and the ticket's URL for step 6.
 
 ## 3. Pick the base
 
@@ -147,12 +148,15 @@ what is true. Several: ask the user which one. None: use this shape:
 ## Notes
 <decisions, things left out on purpose, how to test; omit if empty>
 
-Refs: SZA-6
+Refs: [SZA-6](https://linear.app/<workspace>/issue/SZA-6/...)
 ```
 
-Either way, end with `Refs: <ticket>` (the branch's ticket), unless the
-template already has a place for it or the PR has no ticket. Don't list
-every file or repeat the diff; a reviewer reads that in the PR.
+Either way, end with `Refs: [<ticket>](<ticket URL>)`, the branch's ticket
+linked to its Linear page, unless the template already has a place for the
+ticket (then put the same link there) or the PR has no ticket. Use the URL
+Linear returned in step 2; never build one by hand. Keep it at the end so
+the summary is what shows in previews and notifications. Don't list every
+file or repeat the diff; a reviewer reads that in the PR.
 
 ## 7. Approve
 
