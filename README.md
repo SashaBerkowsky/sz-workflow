@@ -1,12 +1,12 @@
 # sz-workflow
 
 Personal, provider-agnostic AI dev workflow. The repo is organised by what
-things are; `install.sh` links them to where each tool looks for them.
+things are; `setup.sh` links them to where each tool looks for them.
 
 ```
 sz-workflow/
 ├── README.md
-├── install.sh                  # links bin/ and skills/ into $HOME, registers MCP servers
+├── setup.sh                    # install, check, status, uninstall
 ├── bin/
 │   ├── sz-commit               # validated whole-file commits
 │   └── sz-branch               # find, create or switch to a ticket's branch
@@ -29,17 +29,28 @@ Requirements: git, POSIX `sh`, `~/.local/bin` on `PATH`.
 
 ```sh
 git clone <your remote> ~/sz-workflow
-~/sz-workflow/install.sh                  # every AI tool that is present
-~/sz-workflow/install.sh --tool claude    # only Claude Code
-~/sz-workflow/install.sh --tool codex     # only Codex
+~/sz-workflow/setup.sh check      # see what install would do
+~/sz-workflow/setup.sh install    # do it
 ```
 
-| Flag | Values | Default | Description |
-|---|---|---|---|
-| `--tool` | `claude`, `codex`, `all` | `all` | Which AI tool gets the skills and MCP servers. `all` sets up each tool it finds and skips the others; naming one tool that isn't there is an error (exit 1). `--tool=claude` works too. |
-| `--uninstall` | | | Remove what this script installed, for the tools `--tool` selects. |
+`setup.sh` does everything that touches your machine, one action per
+subcommand:
 
-Safe to re-run. What it sets up:
+| Command | What it does |
+|---|---|
+| `setup.sh install` | Link `bin/` and `skills/`, register the MCP servers, and remove links into this repo that no longer point anywhere (a renamed skill). Safe to re-run. |
+| `setup.sh check` | Say what `install` would do, without changing anything. |
+| `setup.sh status` | Show what is installed, what is missing or broken, the MCP servers' login state, and which repos have `sz` settings. Exits 1 if something needs fixing. |
+| `setup.sh uninstall` | Remove what `install` set up and reset the `sz` settings in your repos (see below). |
+
+| Flag | Applies to | Description |
+|---|---|---|
+| `--tool claude\|codex\|all` | `install`, `check`, `uninstall` | Which AI tool to set up or remove; default `all`. `all` covers each tool it finds and skips the others; naming one tool that isn't there is an error (exit 1). `--tool=claude` works too. |
+| `--mcp` | `uninstall` | Also remove the MCP servers. Without it they stay, and the command to remove them is printed: it can't tell whether you added them yourself. |
+| `--keep-config` | `uninstall` | Keep the `sz` settings (scopes, ticket prefix) in your repos. |
+| `--repo PATH` | `uninstall` | Also reset this repo's `sz` settings. Repeatable. |
+
+What `install` sets up:
 
 | What | Where | For |
 |---|---|---|
@@ -57,10 +68,19 @@ skill is linked twice; the repo keeps one copy.
 After a first install, log in to Linear once per tool: `/mcp` in Claude Code,
 `codex mcp login linear-server` in Codex.
 
-`--uninstall` removes only its own links. The `bin/` links are shared, so
-they are removed only when uninstalling every tool (`--tool all`, the
-default). It does not remove MCP servers, since it cannot tell whether you
-added them yourself; it prints the command to do it.
+**Uninstall.** `setup.sh uninstall` removes only its own links. With
+`--tool claude` or `--tool codex` it removes that tool's skills and keeps
+what is shared (the `bin/` links and your repo settings). A full uninstall
+(`--tool all`, the default) also resets, unless `--keep-config`:
+
+- the `sz` section of `.git/config` (scopes, ticket prefix, header max) in
+  every repo `sz-commit` saved a setting in: it adds each one to
+  `~/.config/sz-workflow/repos` when it does. Repos set up before that list
+  existed are covered if you run uninstall from inside them, or pass them
+  with `--repo`;
+- the `commit-msg` hook in those repos, only if `sz-commit install-hook`
+  wrote it;
+- the list itself.
 
 Then, once per machine, merge `config/claude-settings.json` into
 `~/.claude/settings.json` (it is not linked because Claude Code also writes to
@@ -155,7 +175,7 @@ plan. A green hook on commit 2 of 5 does not prove commit 2 builds alone.
 ## Tickets
 
 Both skills use Linear through its MCP server (`linear-server`, set up by
-`install.sh`), and change nothing in Linear without asking.
+`setup.sh install`), and change nothing in Linear without asking.
 
 - `/sz-work PRO-3` reads the ticket and what it depends on, then
   creates or switches to its branch with `sz-branch`. If PRO-3 depends on
@@ -197,8 +217,8 @@ sz-branch switch -c 12 -f c12/pro-2 PRO-3    # create c12/pro-3 from c12/pro-2
 ## Lint
 
 ```sh
-shellcheck -s sh install.sh bin/sz-commit
+shellcheck -s sh setup.sh bin/sz-commit bin/sz-branch
 ```
 
 When you first commit the scripts, make sure they are executable in git:
-`git add --chmod=+x install.sh bin/sz-commit`.
+`git add --chmod=+x setup.sh bin/sz-commit`.

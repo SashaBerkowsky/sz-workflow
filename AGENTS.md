@@ -7,7 +7,7 @@ use the workflow lives in `README.md`.
 ## What this repo is
 
 The owner's personal, provider-agnostic AI dev workflow: scripts, skills and
-config they install on each machine with `install.sh`. It is optimised for one
+config they install on each machine with `setup.sh`. It is optimised for one
 person. Generalising it for a team is a separate, later step that happens
 only when the owner asks for it.
 
@@ -39,9 +39,11 @@ owner reviews them afterwards in the summary tree (see `docs/decisions.md`).
 no stray files, no state in the work tree when `.git/config` or the user's
 config will do, no actions beyond what was asked. Installs create symlinks
 only, never overwrite what they didn't create, and can be undone. The one
-exception is MCP servers: `install.sh` registers them with each tool's own
-`mcp add` command, skips a name that is already taken, and on uninstall
-prints the remove command instead of running it.
+exception is MCP servers: `setup.sh` registers them with each tool's own
+`mcp add` command, skips a name that is already taken, and removes them on
+uninstall only with `--mcp`. Anything a script writes outside the work tree
+(repo settings in `.git/config`, the repo list in `~/.config/sz-workflow`)
+must be reset by `setup.sh uninstall`.
 
 **Narrow permissions.** Allow the specific subcommand (`Bash(sz-commit check *)`),
 never a broad rule (`Bash(git *)`, `Bash(*)`). Read-only commands may be
@@ -50,7 +52,7 @@ rules.
 
 **Portability.** Flag every vendor-specific piece explicitly and name the
 portable alternative or fallback. Keep one copy of each skill in `skills/`
-(Agent Skills `SKILL.md` format); `install.sh` links it to each tool's
+(Agent Skills `SKILL.md` format); `setup.sh` links it to each tool's
 folder. Vendor-only config goes in `config/` and is merged by hand.
 
 **Balance the owner's way of working with LLM readability.** For every
@@ -110,7 +112,9 @@ Do all of these in one commit, so the script and its docs never disagree:
 
 A new script in `bin/` follows the same steps, plus a new
 `docs/bin/<script>.md` page and a line in the `README.md` layout tree.
-Nothing but executables goes in `bin/`; `install.sh` links every file there.
+Nothing but executables goes in `bin/`; `setup.sh` links every file there.
+A script that saves settings in a repo calls `remember_repo` (see
+`bin/sz-commit`), so `setup.sh uninstall` can reset them.
 
 ## Docs
 
@@ -151,14 +155,14 @@ long form; don't copy the manual into the script.
 AGENTS.md         this file
 README.md         install and usage
 docs/             decision log (decisions.md), manuals for bin/ (bin/<script>.md)
-install.sh        symlinks bin/ and skills/ into $HOME
+setup.sh          install, check, status, uninstall (links bin/ and skills/ into $HOME)
 bin/              scripts, linked to ~/.local/bin
 skills/<name>/    skills, linked to each AI tool's skills folder
 config/           vendor-specific config, merged by hand
 ```
 
 Keep the layout organised by what things are, not by where they get
-installed. A new AI tool means one more line in `install.sh`, not a new
+installed. A new AI tool means one more line in `setup.sh`, not a new
 folder.
 
 ## Conventions this repo already uses

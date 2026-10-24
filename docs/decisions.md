@@ -183,3 +183,37 @@
 - Not yet verified: that the Linear MCP server can read and set relations
   (blocked by) and parents. The skills say to report and hand over the text
   if it can't.
+
+## 2026-10-24 · setup.sh replaces install.sh
+
+**Decided**
+- One script, `setup.sh`, with subcommands: `install`, `check` (preview),
+  `status` and `uninstall`, sharing `--tool claude|codex|all`. Rejected: a
+  Makefile (second language, awkward options, the script would still do the
+  work), a `setup/` folder with separate install and uninstall scripts
+  (mirror-image logic that drifts apart), and keeping `install.sh
+  --uninstall` (each new action becomes another flag).
+- `install` and `uninstall` remove broken links into this repo (a renamed
+  skill left `~/.claude/skills/commit-plan` dangling); `status` reports them.
+- A full uninstall resets the `sz` section of `.git/config` and removes the
+  `commit-msg` hook `sz-commit install-hook` wrote, in every repo on
+  `~/.config/sz-workflow/repos`, the current repo and each `--repo`.
+  `--keep-config` skips it. `sz-commit` adds a repo to that list whenever it
+  saves a setting there.
+- `uninstall --mcp` removes the MCP servers; without it they stay.
+
+**Why**
+- Subcommands match `sz-commit` and `sz-branch`, so there is one shape to
+  learn, and `check` gives the installer the preview mode AGENTS.md asks of
+  every script.
+- Repo settings live in each clone, so without a list nothing can find
+  them to undo. The list is in the user's config, not in any work tree.
+- The owner asked for uninstall to reset the repo settings too.
+
+**Redo on migration**
+- MCP add/remove commands per tool, as before. `codex mcp remove` is not in
+  Codex's docs; uninstall tries it and points to `~/.codex/config.toml` if
+  it fails.
+- Not verified on macOS or under `dash` (not installed here), and not
+  linted (`shellcheck` not installed).
+
