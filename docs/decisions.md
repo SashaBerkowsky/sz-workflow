@@ -231,7 +231,9 @@
   ticket's branch while its PR is open (a stacked PR), otherwise the
   default branch.
 - The description follows the repo's PR template when there is one, else a
-  Summary / Changes / Notes shape, and ends with `Refs: <ticket>`.
+  Summary / Changes / Notes shape, and ends with `Refs: <ticket>`, linked
+  to the ticket's Linear page. At the end rather than the top, so the
+  summary is what previews and notifications show.
 - Notes and plans: repos differ (this one has none), so the skill always
   looks, in common note and plan folders and files, tracked or gitignored,
   and uses only those that mention the ticket, its parent or a sub-issue.

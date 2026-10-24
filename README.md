@@ -213,7 +213,7 @@ logged in.
 - **Description:** follows the repo's PR template if there is one
   (`pull_request_template.md` in the root, `docs/` or `.github/`, or a
   `PULL_REQUEST_TEMPLATE/` folder), otherwise a Summary / Changes / Notes
-  shape, and ends with `Refs: <ticket>`.
+  shape, and ends with `Refs: <ticket>` linked to the ticket's Linear page.
 - **Context:** the session, the commits and the Linear ticket, plus any
   notes or plans in the repo, tracked or gitignored, that mention the
   ticket, its parent or its sub-issues. It tells you which it used, or that
