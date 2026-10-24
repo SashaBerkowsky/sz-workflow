@@ -22,7 +22,9 @@ and opening a PR are outward-facing, so nothing here runs on its own.
 - Write only what the commits, the ticket, the notes and this session show.
   Leave out what you don't know rather than guess.
 - Never paste secrets, tokens or personal data from notes into the PR.
-- Change nothing in Linear unless the user says yes to the exact change.
+- In Linear, change only the PR link (step 9) and the ticket's status
+  (step 10), and only as part of what the user approved in step 7. Change
+  nothing else there without the user's yes to the exact change.
 
 ## 1. Read the state
 
@@ -176,7 +178,12 @@ Leave out `git push` when the branch is already pushed and up to date
 (`git status` says so). Quote the title with single quotes; if it contains
 one, write it as `'\''`. Keep the heredoc delimiter quoted (`<<'EOF'`) so
 nothing in the body is expanded, and pick another delimiter if `EOF`
-appears in the body. Add `--draft` only if the user asks for a draft.
+appears in the body. Add `--draft` only if the user explicitly asks for a
+draft; otherwise the PR is always ready for review.
+
+Under the commands, say what happens in Linear afterwards: "then link the
+PR to <ticket> if Linear's GitHub integration doesn't", and, for a PR that
+is not a draft, "move <ticket> to In Review". A draft keeps its status.
 
 Wait for a yes. If the user edits the title or description, show the
 updated commands and wait again.
@@ -187,8 +194,39 @@ Run the approved commands exactly, one per tool call. If `git push` fails
 (rejected, hook failure), stop and show the output; do not retry with other
 flags. If `gh pr create` fails, show the output and stop.
 
-## 9. Report
+## 9. Link the PR to the ticket
 
-Show the PR's URL. Offer once: "Move <ticket> to In Review in Linear?"
-Change it only on yes, and only if the team has such a status; otherwise say
-so.
+Linear's GitHub integration links the PR by itself when it is set up (the
+ticket id is in the branch name or title). The MCP server can't read
+whether it is, so find out from what it does, and link by hand only when it
+didn't, to avoid a duplicate link:
+
+1. Read the ticket's attachments with the Linear MCP server. If one points
+   to the new PR's URL, the integration linked it; go on to step 10.
+2. If not, wait about 30 seconds (the integration usually links within a
+   few) and read them again.
+3. Still not there: the integration is not set up, or not for this repo.
+   Add the PR's URL to the ticket as a link titled
+   `PR #<number>: <PR title>`, and say in the report that you linked it by
+   hand and that the integration doesn't seem to be on.
+
+Skip this step when the PR has no ticket.
+
+## 10. Move the ticket
+
+Only when the PR was opened as ready for review (not `--draft`), and the PR
+has a ticket:
+
+1. Read the ticket's status. If it is already In Review, or further on (the
+   GitHub integration may have moved it), leave it.
+2. Otherwise move it to the team's In Review status with the Linear MCP
+   server. If the team has no status of that name, don't pick another one;
+   say so in the report.
+
+For a draft PR, leave the ticket as it is.
+
+## 11. Report
+
+Show the PR's URL, how it got linked to the ticket (by the integration, or
+by hand), and the ticket's status in Linear: moved to In Review, already
+there, left as it is (draft), or not moved and why.
