@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Instructions for any AI agent (Claude Code, Codex, others) working **on this
-repo**. What was decided and why lives in `decisions.md`. How to install and
+repo**. What was decided and why lives in `docs/decisions.md`. How to install and
 use the workflow lives in `README.md`.
 
 ## What this repo is
@@ -32,7 +32,8 @@ dry-run mode so a skill can validate a plan before the user sees it.
 
 **The user approves before anything irreversible or outward-facing.**
 Skills show the exact commands and wait. Nothing pushes, posts or deletes on
-its own.
+its own. Local commits made through `sz-commit` are the one exception: the
+owner reviews them afterwards in the summary tree (see `docs/decisions.md`).
 
 **Minimal footprint.** An automation does its stated job and nothing else:
 no stray files, no state in the work tree when `.git/config` or the user's
@@ -65,7 +66,7 @@ history easy for an LLM session to read, then give a recommendation.
 2. **Link a source only when an authoritative one exists** (official docs,
    the project's own repo or site).
 3. **For each new convention**, give the tradeoff and a recommendation.
-4. **At the end of each feature**, add a short entry to `decisions.md`:
+4. **At the end of each feature**, add a short entry to `docs/decisions.md`:
    what was decided, why, and which tool-specific parts would need redoing
    on migration.
 5. Deliverables are plain files: markdown, POSIX shell, JSON. No build step.
@@ -79,6 +80,8 @@ history easy for an LLM session to read, then give a recommendation.
 - Default to POSIX `sh` (`#!/bin/sh`, `set -eu`). Use bash only when it buys
   something real, and say so in the header comment.
 - Header comment: what the script does, which shell, and the usage.
+- Document every script, subcommand and flag in `docs/bin/<script>.md`
+  (see Docs below). Update it in the same commit as the script.
 - Lint clean with `shellcheck -s sh`. Don't silence a warning without a
   comment explaining why.
 - Validate every argument a model can pass. Fail with one clear line on
@@ -87,6 +90,47 @@ history easy for an LLM session to read, then give a recommendation.
 - Test under both `dash` and `bash` on a scratch repo, including the failure
   paths, before calling a change done.
 
+### Adding a subcommand or flag
+
+Do all of these in one commit, so the script and its docs never disagree:
+
+1. Add it to the script's header comment (the usage block) and to the
+   dispatch `case` at the bottom.
+2. Validate its arguments as above, and test success and failure paths.
+3. Add an entry to `docs/bin/<script>.md`: the synopsis, its
+   table-of-contents line, and the template under Docs.
+4. If it changes what the user does, update `README.md`. If a skill should
+   call it, update that skill's `SKILL.md`.
+5. If Claude Code needs a permission rule, add the narrowest one to
+   `config/claude-settings.json`: `allow` only if it is read-only, `ask` if
+   it writes.
+
+A new script in `bin/` follows the same steps, plus a new
+`docs/bin/<script>.md` page and a line in the `README.md` layout tree.
+Nothing but executables goes in `bin/`; `install.sh` links every file there.
+
+## Docs
+
+Everything that is documentation but not the entry point lives in `docs/`.
+
+| File | Holds | Update when |
+|---|---|---|
+| `README.md` (root) | Install and day-to-day usage | What the user types or sees changes |
+| `AGENTS.md` (root) | Rules for working on the repo | A rule or convention changes |
+| `docs/decisions.md` | Decision log, newest entry at the bottom | At the end of each feature |
+| `docs/bin/<script>.md` | Manual for one script in `bin/` | A subcommand or flag changes |
+
+A manual page has a synopsis, a description, the configuration keys and the
+exit codes, then one entry per subcommand with:
+
+- **What it's for**: what it does, in one or two sentences.
+- **Why it exists**: the problem it solves or who calls it.
+- A table of its flags or arguments: name, argument, required, description.
+- An example, when the usage isn't obvious.
+
+Keep the script's header comment as the short usage and the manual as the
+long form; don't copy the manual into the script.
+
 ## Skills
 
 - One folder per skill under `skills/<name>/`, with `SKILL.md` and any
@@ -94,7 +138,7 @@ history easy for an LLM session to read, then give a recommendation.
   `skills/commit-plan/setup.md`).
 - Frontmatter: `name` and `description` are portable. Anything else (for
   example `disable-model-invocation`) is vendor-specific; note it in
-  `decisions.md`.
+  `docs/decisions.md`.
 - Spell out the commands the skill runs, the rules it must not break, and
   where it stops for approval or on failure.
 
@@ -103,7 +147,7 @@ history easy for an LLM session to read, then give a recommendation.
 ```
 AGENTS.md         this file
 README.md         install and usage
-decisions.md      decision log
+docs/             decision log (decisions.md), manuals for bin/ (bin/<script>.md)
 install.sh        symlinks bin/ and skills/ into $HOME
 bin/              scripts, linked to ~/.local/bin
 skills/<name>/    skills, linked to each AI tool's skills folder

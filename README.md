@@ -6,10 +6,12 @@ things are; `install.sh` links them to where each tool looks for them.
 ```
 sz-workflow/
 ├── README.md
-├── decisions.md
 ├── install.sh                  # links bin/ and skills/ into $HOME
 ├── bin/
 │   └── sz-commit               # validated whole-file commits
+├── docs/
+│   ├── decisions.md            # decision log
+│   └── bin/sz-commit.md        # manual: every subcommand and flag
 ├── skills/
 │   └── commit-plan/SKILL.md    # one copy, used by Claude Code and Codex
 └── config/
@@ -62,18 +64,28 @@ The longest matching path wins. `sz-commit check` rejects a commit whose
 files all belong to a different scope than the one given, and warns when
 they span several.
 
-Other optional settings: `git config sz.ticketPrefix pro` (default `pro`),
-`git config sz.headerMax 72` (default 72).
+The ticket prefix is also set once per clone. If it is not set, the skill
+asks you for it and saves it with `sz-commit ticket-prefix sza` (in
+`.git/config`; without it `sz-commit` falls back to `pro`).
+
+Other optional setting: `git config sz.headerMax 72` (default 72).
 
 ## Commits
 
-Inside Claude Code, run `/commit-plan` (plan mode works well: Ctrl+G opens the
-plan in your editor). In Codex, ask for the `commit-plan` skill.
+Inside Claude Code, run `/commit-plan`. In Codex, ask for the `commit-plan`
+skill.
 
 The skill reads `git status` and `git diff`, groups whole files into commits,
-validates each with `sz-commit check`, shows you the exact
-`sz-commit apply ...` commands and waits. After you approve, it runs them in
-order and stops at the first failure.
+validates each with `sz-commit check`, then runs the `sz-commit apply ...`
+commands in order without asking, and stops at the first failure. It ends
+with `sz-commit summary`, so you review the commits as a tree afterwards. If
+the branch has no ticket, it first asks whether to reference one. Say "show
+me the plan first" when you want to review before anything is committed.
+
+Forgot a file? Make the change, then tell the skill to fold it into the last
+run. It runs `sz-commit undo <n>` to put that run's commits back into the
+working tree, and plans everything again. `undo` refuses if any of those
+commits are pushed.
 
 `sz-commit` is usable without any agent:
 
