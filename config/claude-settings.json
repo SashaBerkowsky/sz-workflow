@@ -8,7 +8,8 @@
       "Bash(sz-commit scope-of *)"
     ],
     "ask": [
-      "Bash(sz-commit apply *)"
+      "Bash(sz-commit apply *)",
+      "Bash(sz-commit undo *)"
     ],
     "deny": [
       "Bash(git commit *)",
