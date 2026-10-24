@@ -217,3 +217,42 @@
 - Not verified on macOS or under `dash` (not installed here), and not
   linted (`shellcheck` not installed).
 
+
+## 2026-10-24 · /sz-pr opens a PR for the current ticket
+
+**Decided**
+- A new skill, `skills/sz-pr/`, drafts the PR and runs `git push` and
+  `gh pr create` only after the user approves the exact commands. No
+  `bin/sz-pr` script: the owner saw no need, so the title format and the
+  no-attribution rule are enforced only by the skill's wording, against the
+  "deterministic mechanisms for invariants" principle. The title reuses
+  `sz-commit config` (types, header max) and `sz-commit scope-of`.
+- The base is the branch the work was built on: a blocking or parent
+  ticket's branch while its PR is open (a stacked PR), otherwise the
+  default branch.
+- The description follows the repo's PR template when there is one, else a
+  Summary / Changes / Notes shape, and ends with `Refs: <ticket>`.
+- Notes and plans: repos differ (this one has none), so the skill always
+  looks, in common note and plan folders and files, tracked or gitignored,
+  and uses only those that mention the ticket, its parent or a sub-issue.
+  If none match, it uses the session, the commits and the ticket.
+- The body goes to `gh pr create --body-file -` through a quoted heredoc,
+  so no temp file is written to the work tree.
+
+**Why**
+- Hand-written PRs didn't follow the commit standard or the repo's
+  template (SZA-6).
+- A stacked PR keeps the diff to this ticket's changes when it builds on an
+  unmerged one, as `sz-work` allows.
+
+**Redo on migration**
+- `gh` is GitHub only; another forge needs its own CLI (`glab mr create`
+  for GitLab) and its own template locations.
+- Template locations are from GitHub's docs (root, `docs/`, `.github/`,
+  or a `PULL_REQUEST_TEMPLATE/` folder in those). The docs don't say
+  whether names are case-sensitive, so the skill matches in any case.
+- `disable-model-invocation` and the permission rules in
+  `config/claude-settings.json` (`gh pr view`/`list` allowed,
+  `git push -u origin` and `gh pr create` on ask) are Claude Code only.
+- If no-attribution in PRs ever needs a hard guarantee, that is the point
+  to add a script with a `check` mode after all.
