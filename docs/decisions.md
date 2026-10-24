@@ -131,3 +131,55 @@
   (Claude Code only); the new tool needs the same rule.
 - The pushed check reads remote-tracking refs, so it is only as fresh as the
   last `git fetch`.
+
+## 2026-10-24 · Ticket skills, sz-branch, MCP in install.sh
+
+**Decided**
+- Two skills instead of branch handling in `/sz-commit`: `sz-work`
+  (read a Linear ticket and its dependencies, get onto its branch) and
+  `sz-new` (draft a ticket from a problem the user saw, create it after
+  approval). `/sz-commit` never changes branches; it points to
+  `sz-work`.
+- New script `sz-branch` (`find`, `check`, `switch`) does the git part.
+  Names are `[c<N>/]<prefix>-<n>`; an existing branch is reused; only plain
+  `git switch`, so uncommitted work is never overwritten. It shares
+  `sz.ticketPrefix` with `sz-commit` but has no `pro` fallback, so the
+  skill asks for the prefix instead of guessing.
+- Branching ticket B from ticket A's branch records the dependency in
+  Linear, after the user agrees: B becomes a sub-issue of A, is marked
+  blocked by A, and both get a comment.
+- `sz-new` picks the team whose key matches the repo's prefix, and asks
+  when unsure. `sz-work` offers to move the ticket to In Progress.
+- Linear access through Linear's official MCP server
+  (`https://mcp.linear.app/mcp`), registered by `install.sh` with each
+  tool's `mcp add`. Chosen over `schpet/linear-cli` (active, ~1k stars, but
+  community-run): the MCP server is Linear's own and documented for both
+  Claude Code and Codex.
+- Skill names share the `sz-` prefix and stay short: `sz-work` (start a
+  ticket), `sz-new` (file one), and `commit-plan` renamed to `sz-commit`,
+  the same name as the script it calls. Earlier entries keep the old names.
+- `install.sh --tool claude|codex|all` (default `all`) picks which tool to
+  set up. `bin/` is shared, so a per-tool uninstall keeps it. MCP servers
+  are never removed by uninstall; it prints the command.
+
+**Why**
+- Starting a ticket and filing one are separate moments with different
+  questions; keeping them out of `/sz-commit` keeps that skill about
+  commits.
+- Where to branch from is judgment (it depends on Linear data), so the
+  skill decides; naming, reuse and not losing work are invariants, so the
+  script enforces them.
+- Recording a branch-from as both sub-issue and blocked-by was the owner's
+  choice: it shows up in Linear from either ticket.
+
+**Redo on migration**
+- The skills name Linear features (sub-issue, blocked by, comments,
+  status), not MCP tool names, since Linear does not document those. Check
+  the new tool can reach the same MCP server.
+- `install.sh` uses `claude mcp add -s user --transport http` and
+  `codex mcp add NAME --url`; Codex's `mcp remove` is not documented, so
+  uninstall points to `~/.codex/config.toml`. A new tool needs its own pair.
+- `disable-model-invocation` in the new skills is Claude Code only.
+- Not yet verified: that the Linear MCP server can read and set relations
+  (blocked by) and parents. The skills say to report and hand over the text
+  if it can't.

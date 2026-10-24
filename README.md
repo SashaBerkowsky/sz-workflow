@@ -6,14 +6,19 @@ things are; `install.sh` links them to where each tool looks for them.
 ```
 sz-workflow/
 ├── README.md
-├── install.sh                  # links bin/ and skills/ into $HOME
+├── install.sh                  # links bin/ and skills/ into $HOME, registers MCP servers
 ├── bin/
-│   └── sz-commit               # validated whole-file commits
+│   ├── sz-commit               # validated whole-file commits
+│   └── sz-branch               # find, create or switch to a ticket's branch
 ├── docs/
 │   ├── decisions.md            # decision log
-│   └── bin/sz-commit.md        # manual: every subcommand and flag
-├── skills/
-│   └── commit-plan/SKILL.md    # one copy, used by Claude Code and Codex
+│   └── bin/                    # manuals: every subcommand and flag
+│       ├── sz-commit.md
+│       └── sz-branch.md
+├── skills/                     # one copy each, used by Claude Code and Codex
+│   ├── sz-commit/SKILL.md      # group changes into commits (calls bin/sz-commit)
+│   ├── sz-work/SKILL.md        # get onto a Linear ticket's branch (calls bin/sz-branch)
+│   └── sz-new/SKILL.md         # turn a bug you saw into a Linear ticket
 └── config/
     └── claude-settings.json    # merge by hand into ~/.claude/settings.json
 ```
@@ -24,27 +29,44 @@ Requirements: git, POSIX `sh`, `~/.local/bin` on `PATH`.
 
 ```sh
 git clone <your remote> ~/sz-workflow
-~/sz-workflow/install.sh
+~/sz-workflow/install.sh                  # every AI tool that is present
+~/sz-workflow/install.sh --tool claude    # only Claude Code
+~/sz-workflow/install.sh --tool codex     # only Codex
 ```
 
-It creates symlinks only, and is safe to re-run:
+| Flag | Values | Default | Description |
+|---|---|---|---|
+| `--tool` | `claude`, `codex`, `all` | `all` | Which AI tool gets the skills and MCP servers. `all` sets up each tool it finds and skips the others; naming one tool that isn't there is an error (exit 1). `--tool=claude` works too. |
+| `--uninstall` | | | Remove what this script installed, for the tools `--tool` selects. |
 
-| From | To | When |
+Safe to re-run. What it sets up:
+
+| What | Where | For |
 |---|---|---|
-| `bin/*` | `~/.local/bin/` (override with `SZ_BIN_DIR`) | always |
-| `skills/<name>/` | `~/.claude/skills/<name>` | `~/.claude` exists (Claude Code) |
-| `skills/<name>/` | `~/.agents/skills/<name>` | `~/.codex` exists (Codex) |
+| `bin/*` (symlinks) | `~/.local/bin/` (override with `SZ_BIN_DIR`) | always |
+| `skills/<name>/` (symlinks) | `~/.claude/skills/<name>` | `claude`; needs `~/.claude` |
+| `skills/<name>/` (symlinks) | `~/.agents/skills/<name>` | `codex`; needs `~/.codex` |
+| MCP server `linear-server` → `https://mcp.linear.app/mcp` | user scope, via `claude mcp add` | `claude`; needs the `claude` CLI |
+| MCP server `linear-server` → `https://mcp.linear.app/mcp` | via `codex mcp add` | `codex`; needs the `codex` CLI |
 
 It never overwrites a file that is not its own link; it reports a conflict
-and exits 1 instead. `install.sh --uninstall` removes only its own links.
-Each tool reads skills from its own folder, so the same skill is linked
-twice; the repo keeps one copy.
+and exits 1 instead. If an MCP server with that name is already registered,
+it leaves it alone. Each tool reads skills from its own folder, so the same
+skill is linked twice; the repo keeps one copy.
+
+After a first install, log in to Linear once per tool: `/mcp` in Claude Code,
+`codex mcp login linear-server` in Codex.
+
+`--uninstall` removes only its own links. The `bin/` links are shared, so
+they are removed only when uninstalling every tool (`--tool all`, the
+default). It does not remove MCP servers, since it cannot tell whether you
+added them yourself; it prints the command to do it.
 
 Then, once per machine, merge `config/claude-settings.json` into
 `~/.claude/settings.json` (it is not linked because Claude Code also writes to
 that file).
 
-Scopes are set up once per clone. The first time you run `/commit-plan` in a
+Scopes are set up once per clone. The first time you run `/sz-commit` in a
 repo with no scopes, the skill scans how the repo is organised (Nx projects,
 other workspace packages, or, in a single-project repo, layers or domains),
 proposes a scope table, and after you approve saves it with
@@ -72,8 +94,10 @@ Other optional setting: `git config sz.headerMax 72` (default 72).
 
 ## Commits
 
-Inside Claude Code, run `/commit-plan`. In Codex, ask for the `commit-plan`
-skill.
+Inside Claude Code, run `/sz-commit`. In Codex, ask for the `sz-commit`
+skill. The skill and the script share the name: `/sz-commit` is the skill,
+which groups and words the commits, and `sz-commit` in a shell is the script
+it calls to make them.
 
 The skill reads `git status` and `git diff`, groups whole files into commits,
 validates each with `sz-commit check`, then runs the `sz-commit apply ...`
@@ -86,6 +110,8 @@ Forgot a file? Make the change, then tell the skill to fold it into the last
 run. It runs `sz-commit undo <n>` to put that run's commits back into the
 working tree, and plans everything again. `undo` refuses if any of those
 commits are pushed.
+
+## sz-commit without an agent
 
 `sz-commit` is usable without any agent:
 
@@ -125,6 +151,31 @@ What it guarantees:
 Note on husky: your pre-commit hook runs tests against the whole working
 tree, which still holds the changes of the commits that come later in the
 plan. A green hook on commit 2 of 5 does not prove commit 2 builds alone.
+
+## Tickets
+
+Both skills use Linear through its MCP server (`linear-server`, set up by
+`install.sh`), and change nothing in Linear without asking.
+
+- `/sz-work PRO-3` reads the ticket and what it depends on, then
+  creates or switches to its branch with `sz-branch`. If PRO-3 depends on
+  PRO-2, it branches from PRO-2's branch (and asks if you are somewhere
+  else). If you are on PRO-2's branch and PRO-3 doesn't depend on anything
+  yet, it asks whether PRO-3 should build on PRO-2; on yes it makes PRO-3 a
+  sub-issue of PRO-2, marks it blocked by PRO-2, and comments on both. It
+  then offers to move PRO-3 to In Progress.
+- `/sz-new` turns something you saw into a ticket: it looks at the code
+  or error you point it to, checks for duplicates, shows you a draft and
+  creates it after you approve. The team is the one matching this repo's
+  ticket prefix. It then offers to start on it.
+
+`sz-branch` is usable on its own (manual: `docs/bin/sz-branch.md`):
+
+```sh
+sz-branch find PRO-3                         # branches for PRO-3
+sz-branch check -c 12 -f c12/pro-2 PRO-3     # what switch would do
+sz-branch switch -c 12 -f c12/pro-2 PRO-3    # create c12/pro-3 from c12/pro-2
+```
 
 ## AI attribution guard, in layers
 

@@ -38,7 +38,10 @@ owner reviews them afterwards in the summary tree (see `docs/decisions.md`).
 **Minimal footprint.** An automation does its stated job and nothing else:
 no stray files, no state in the work tree when `.git/config` or the user's
 config will do, no actions beyond what was asked. Installs create symlinks
-only, never overwrite what they didn't create, and can be undone.
+only, never overwrite what they didn't create, and can be undone. The one
+exception is MCP servers: `install.sh` registers them with each tool's own
+`mcp add` command, skips a name that is already taken, and on uninstall
+prints the remove command instead of running it.
 
 **Narrow permissions.** Allow the specific subcommand (`Bash(sz-commit check *)`),
 never a broad rule (`Bash(git *)`, `Bash(*)`). Read-only commands may be
@@ -135,7 +138,7 @@ long form; don't copy the manual into the script.
 
 - One folder per skill under `skills/<name>/`, with `SKILL.md` and any
   supporting files the skill reads only when needed (see
-  `skills/commit-plan/setup.md`).
+  `skills/sz-commit/setup.md`).
 - Frontmatter: `name` and `description` are portable. Anything else (for
   example `disable-model-invocation`) is vendor-specific; note it in
   `docs/decisions.md`.
