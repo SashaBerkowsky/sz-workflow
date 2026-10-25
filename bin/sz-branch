@@ -62,7 +62,9 @@ remote_matches() {
   pat=$(pattern "$1")
   git for-each-ref --format='%(refname:short)' refs/remotes | while IFS= read -r r; do
     case $r in */HEAD) continue ;; esac
-    printf '%s\n' "${r#*/}" | grep -Eq "$pat" && printf '%s\n' "$r"
+    # if, not &&: a failed && would end the loop with status 1, and set -e
+    # would then exit before `return 0` when the last branch does not match.
+    if printf '%s\n' "${r#*/}" | grep -Eq "$pat"; then printf '%s\n' "$r"; fi
   done
   return 0
 }

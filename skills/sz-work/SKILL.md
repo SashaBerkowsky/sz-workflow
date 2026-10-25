@@ -40,6 +40,13 @@ title, status, cycle (its number), parent, sub-issues, and its relations,
 especially the tickets it is **blocked by**. If the ticket does not exist,
 stop and say so.
 
+The default `get_issue` response leaves the cycle out, so a missing cycle
+there does not mean the ticket has none. Ask for `cycleId` explicitly
+(`fields` with `cycleId`). If it is set, find that cycle in `list_cycles`
+for the ticket's team and use its **number** for `-c`, not its id. If
+`cycleId` is null, the ticket has no cycle and the branch gets no `c<N>/`
+prefix.
+
 Show the user one short summary: id, title, status, cycle, and what it
 depends on (blocked by, parent).
 

@@ -217,3 +217,78 @@
 - Not verified on macOS or under `dash` (not installed here), and not
   linted (`shellcheck` not installed).
 
+
+## 2026-10-24 · /sz-pr opens a PR for the current ticket
+
+**Decided**
+- A new skill, `skills/sz-pr/`, drafts the PR and runs `git push` and
+  `gh pr create` only after the user approves the exact commands. No
+  `bin/sz-pr` script: the owner saw no need, so the title format and the
+  no-attribution rule are enforced only by the skill's wording, against the
+  "deterministic mechanisms for invariants" principle. The title reuses
+  `sz-commit config` (types, header max) and `sz-commit scope-of`.
+- The base is the branch the work was built on: a blocking or parent
+  ticket's branch while its PR is open (a stacked PR), otherwise the
+  default branch.
+- The description follows the repo's PR template when there is one, else a
+  Summary / Changes / Notes shape, and ends with `Refs: <ticket>`, linked
+  to the ticket's Linear page. At the end rather than the top, so the
+  summary is what previews and notifications show.
+- Notes and plans: repos differ (this one has none), so the skill always
+  looks, in common note and plan folders and files, tracked or gitignored,
+  and uses only those that mention the ticket, its parent or a sub-issue.
+  If none match, it uses the session, the commits and the ticket.
+- The body goes to `gh pr create --body-file -` through a quoted heredoc,
+  so no temp file is written to the work tree.
+- PRs are ready for review unless the caller explicitly asks for a draft.
+  After a ready PR opens, the skill moves the ticket to In Review; the
+  approval of the commands covers that change, so it doesn't ask twice. A
+  draft leaves the ticket alone.
+- Linking the PR to the ticket is Linear's GitHub integration's job. The
+  skill links by hand only when the integration hasn't attached the PR
+  after about 30 seconds, since the MCP server can't read whether the
+  integration is set up. If the integration is slower than that, the
+  ticket gets a duplicate link; harmless, and removable in Linear.
+
+**Why**
+- Hand-written PRs didn't follow the commit standard or the repo's
+  template (SZA-6).
+- A stacked PR keeps the diff to this ticket's changes when it builds on an
+  unmerged one, as `sz-work` allows.
+
+**Redo on migration**
+- `gh` is GitHub only; another forge needs its own CLI (`glab mr create`
+  for GitLab) and its own template locations.
+- Template locations are from GitHub's docs (root, `docs/`, `.github/`,
+  or a `PULL_REQUEST_TEMPLATE/` folder in those). The docs don't say
+  whether names are case-sensitive, so the skill matches in any case.
+- `disable-model-invocation` and the permission rules in
+  `config/claude-settings.json` (`gh pr view`/`list` allowed,
+  `git push -u origin` and `gh pr create` on ask) are Claude Code only.
+- If no-attribution in PRs ever needs a hard guarantee, that is the point
+  to add a script with a `check` mode after all.
+
+## 2026-10-24 · /sz-new drafts from the team's issue templates
+
+**Decided**
+- `/sz-new` lists the team's and workspace's issue templates, infers the
+  kind of ticket from what it gathered, and picks the template made for
+  it, saying why. When several fit or the kind is unclear, the user picks.
+  With no templates, or none that fits, it keeps the fixed shape.
+- Form templates are used like any other, not skipped (the owner's
+  choice). The Linear MCP server applies a form template with the form
+  unanswered, so the skill says so first and offers to create it anyway,
+  with the answers written in the description, or to use another template.
+- The filled body is passed as `description` together with `template`,
+  because a description replaces the template's body while its labels,
+  fields and sub-issues still apply.
+
+**Why**
+- Tickets should take the shape the team chose in Linear (SZA-5).
+
+**Redo on migration**
+- Uses the Linear MCP server's `list_templates`, `get_template` and the
+  `template` argument of `save_issue`; the skill names them because the
+  behaviour depends on them (body replaced, form unanswered).
+- Not tested against a real template: the SZA team has none yet. Create
+  one (and a form template) in Linear to try it.
