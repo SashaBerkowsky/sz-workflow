@@ -16,7 +16,10 @@
       "Bash(sz-commit undo *)",
       "Bash(sz-branch switch *)",
       "Bash(git push -u origin *)",
-      "Bash(gh pr create *)"
+      "Bash(gh pr create *)",
+      "Bash(gh api graphql *)",
+      "Bash(gh api repos/{owner}/{repo}/pulls/*/comments/*/replies *)",
+      "Bash(gh pr comment *)"
     ],
     "deny": [
       "Bash(git commit *)",
