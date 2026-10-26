@@ -113,7 +113,11 @@ else. `sz-commit` has already unstaged the failed commit's files.
 
 Run `sz-commit summary <number of commits applied>` and `git status --short`,
 and show both outputs to the user as they are, in code blocks. The summary
-lists each commit with its files as a tree.
+lists each commit with its files as a tree. Under each commit in the tree,
+add one short line in your own words on what that commit introduces (for a
+reader skimming the tree, not a repeat of the subject). This line is your
+own annotation on top of the script's output, never part of the commit
+message itself.
 
 End with "Not committed:" listing any changed files left out and why, or
 "none".
