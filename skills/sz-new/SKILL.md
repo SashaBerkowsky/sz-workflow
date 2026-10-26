@@ -129,4 +129,5 @@ and URL, and what the template added (labels, sub-issues).
 ## 6. Next
 
 Offer once: "Start working on it now?" If yes, follow the `sz-work`
-skill for the new ticket.
+skill for the new ticket, which also offers to move it to In Progress
+and assign it to the user.

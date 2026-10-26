@@ -102,7 +102,8 @@ text to add by hand.
 
 ## 6. Status
 
-Offer once: "Move TARGET to In Progress in Linear?" Change it only on yes.
+Offer once: "Move TARGET to In Progress and assign it to you in Linear?"
+Change only what the user agrees to.
 
 ## 7. Report
 
