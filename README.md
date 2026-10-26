@@ -12,6 +12,7 @@ sz-workflow/
 │   └── sz-branch               # find, create or switch to a ticket's branch
 ├── docs/
 │   ├── decisions.md            # decision log
+│   ├── skills.md               # what each skill does and why it exists
 │   └── bin/                    # manuals: every subcommand and flag
 │       ├── sz-commit.md
 │       └── sz-branch.md
@@ -19,7 +20,8 @@ sz-workflow/
 │   ├── sz-commit/SKILL.md      # group changes into commits (calls bin/sz-commit)
 │   ├── sz-work/SKILL.md        # get onto a Linear ticket's branch (calls bin/sz-branch)
 │   ├── sz-new/SKILL.md         # turn a bug you saw into a Linear ticket
-│   └── sz-pr/SKILL.md          # open a PR for the current ticket's branch
+│   ├── sz-pr/SKILL.md          # open a PR for the current ticket's branch
+│   └── sz-adjust/SKILL.md      # answer a PR's review, list the changes asked for
 └── config/
     └── claude-settings.json    # merge by hand into ~/.claude/settings.json
 ```
@@ -230,6 +232,32 @@ moves the ticket to In Review in Linear (part of what you approve); a draft
 leaves the ticket as it is. If Linear's GitHub integration hasn't linked the
 PR to the ticket within about 30 seconds, it adds the link itself, so
 there is never a duplicate when the integration is on.
+
+## Review comments
+
+`/sz-adjust` works through the review on the PR of the branch you are on.
+It needs `gh`, logged in.
+
+1. It reads the conversation comments, the review summaries and the inline
+   threads, and leaves out resolved threads, comments you already answered,
+   your own comments and bot noise.
+2. It reads the Linear ticket and its comments (and the parent's) for
+   context: what the ticket is for, what was decided and left out. It only
+   reads Linear, and doesn't paste Linear text into the PR.
+3. It sorts what is left: questions about the code and small nits get a
+   drafted reply; requests that need real code changes go on a to-do list,
+   marked when they go beyond the ticket; thanks and approvals are
+   skipped.
+4. It shows the drafts, short and in your voice (no dashes, emojis or
+   commit SHAs), and posts them only after you correct and approve them:
+   inline comments as replies in their thread, the rest in one PR comment.
+5. It ends with the numbered list of changes to make, including the nits
+   your replies agreed to. It changes no code.
+
+If the branch has no ticket, no PR, or a PR with no comments, it tells you
+which branch you are on and asks which ticket you meant, switches to that
+ticket's branch with `sz-branch`, and goes on from there. It never
+resolves threads or submits a review.
 
 ## AI attribution guard, in layers
 

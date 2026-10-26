@@ -292,3 +292,49 @@
   behaviour depends on them (body replaced, form unanswered).
 - Not tested against a real template: the SZA team has none yet. Create
   one (and a form template) in Linear to try it.
+
+## 2026-10-26 · /sz-adjust answers a PR's review
+
+**Decided**
+- A new skill, `skills/sz-adjust/`, reads the review on the current
+  branch's PR, drafts replies to questions and small nits, posts them after
+  the user approves the exact text, and ends with a list of the change
+  requests. It changes no code. No `bin/` script, as with `/sz-pr`: the
+  reply style (no dashes, emojis, SHAs or attribution) is enforced only by
+  the skill's wording.
+- No ticket, no PR, or a PR with no comments means the user is probably on
+  the wrong branch: the skill asks for the ticket once, switches with
+  `sz-branch switch`, and starts again. It doesn't ask twice.
+- Small idiomatic corrections are answered rather than listed as work, as
+  the owner asked. A reply that agrees to a nit doesn't make the change, so
+  those nits also go on the final list.
+- Inline comments get a reply in their thread. Conversation comments and
+  review summaries have no thread, so their answers go in one PR comment,
+  each under a quote, which notifies reviewers once instead of per answer.
+- The skill never resolves threads or submits a review: resolving is the
+  reviewer's call.
+- Before sorting, it reads the Linear ticket and its comments (and the
+  parent's) for context: reviewers often ask about what the ticket decided
+  or left out. Linear is read only, and its text isn't pasted into the PR,
+  which may be seen by people outside the team. A change request that goes
+  beyond the ticket is marked, so it can become a follow-up.
+- Comments the user already answered are left out: the user wrote the last
+  comment of a thread, or replied later in the conversation. The PR's
+  author is taken to be the user.
+
+**Why**
+- Answering a review by hand meant writing the same short replies and then
+  rebuilding the to-do list from scattered threads.
+
+**Redo on migration**
+- Linear context uses the MCP server's `get_issue` and `list_comments`.
+- GitHub only: inline threads (with their resolved and outdated state) come
+  from the GraphQL `reviewThreads` field, replies from the REST
+  `pulls/<n>/comments/<id>/replies` endpoint, the rest from
+  `gh pr view --json comments,reviews` and `gh pr comment`. GitLab needs
+  `glab` and its discussions API.
+- `disable-model-invocation` and the permission rules are Claude Code only.
+  `gh api` can read and write, so even the read of the threads stays on
+  `ask`: no prefix rule can tell a query from a mutation.
+- Tested only the read queries, against a PR with no review threads; the
+  reply and comment posting is untested.
