@@ -126,6 +126,7 @@ Everything that is documentation but not the entry point lives in `docs/`.
 | `AGENTS.md` (root) | Rules for working on the repo | A rule or convention changes |
 | `docs/decisions.md` | Decision log, newest entry at the bottom | At the end of each feature |
 | `docs/bin/<script>.md` | Manual for one script in `bin/` | A subcommand or flag changes |
+| `docs/skills.md` | One entry per skill: what it's for, why it exists, what it calls, where it stops | A skill is added, renamed or changes what it does |
 
 A manual page has a synopsis, a description, the configuration keys and the
 exit codes, then one entry per subcommand with:
@@ -148,13 +149,15 @@ long form; don't copy the manual into the script.
   `docs/decisions.md`.
 - Spell out the commands the skill runs, the rules it must not break, and
   where it stops for approval or on failure.
+- Add or update its entry in `docs/skills.md` in the same commit as the
+  skill, and its line in the `README.md` layout tree.
 
 ## Repo layout
 
 ```
 AGENTS.md         this file
 README.md         install and usage
-docs/             decision log (decisions.md), manuals for bin/ (bin/<script>.md)
+docs/             decision log (decisions.md), skills (skills.md), manuals for bin/ (bin/<script>.md)
 setup.sh          install, check, status, uninstall (links bin/ and skills/ into $HOME)
 bin/              scripts, linked to ~/.local/bin
 skills/<name>/    skills, linked to each AI tool's skills folder
