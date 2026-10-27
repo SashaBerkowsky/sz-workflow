@@ -114,7 +114,12 @@ the description comes from the session, the commits and the ticket.
 
 ## 5. Write the title
 
-`type(scope): subject`, the same standard as the commits:
+`type(scope): TICKET subject`, the commit standard with the ticket in
+front of the subject:
+
+```
+feat(pr): SZA-6 add a skill that opens a PR
+```
 
 - `type`: one of the `types:` from `sz-commit config`, for the PR as a
   whole (a feature with its docs and fixes is `feat`).
@@ -123,9 +128,11 @@ the description comes from the session, the commits and the ticket.
   - They span several scopes, or none, or the repo has no scopes: pick one
     from context, either the scope most of the change is in or a broader
     name that covers them all, and say what you chose and why.
+- `TICKET`: the branch's ticket from step 1, in upper case (`SZA-6`), with
+  no brackets. Leave it out when the PR has no ticket.
 - `subject`: imperative, lower case, no trailing period, what the PR does
   as a whole ("add a skill that opens a PR", not "sz-pr changes").
-- The whole title fits in `max:` from `sz-commit config`.
+- The whole title, ticket included, fits in `max:` from `sz-commit config`.
 
 ## 6. Write the description
 
@@ -171,7 +178,7 @@ Show the user, in this order:
 ```sh
 git push -u origin sza-6
 gh pr create --base main --head sza-6 \
-  --title 'feat(pr): add a skill that opens a PR for the current ticket' \
+  --title 'feat(pr): SZA-6 add a skill that opens a PR for the current ticket' \
   --body-file - <<'EOF'
 ## Summary
 ...
