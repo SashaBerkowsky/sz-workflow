@@ -20,6 +20,7 @@ sz-workflow/
 │   ├── sz-commit/SKILL.md      # group changes into commits (calls bin/sz-commit)
 │   ├── sz-work/SKILL.md        # get onto a Linear ticket's branch (calls bin/sz-branch)
 │   ├── sz-new/SKILL.md         # turn a bug you saw into a Linear ticket
+│   ├── sz-split/SKILL.md       # split a big branch's ticket into sub-issues
 │   ├── sz-pr/SKILL.md          # open a PR for the current ticket's branch
 │   └── sz-adjust/SKILL.md      # answer a PR's review, list the changes asked for
 └── config/
@@ -204,6 +205,33 @@ sz-branch find PRO-3                         # branches for PRO-3
 sz-branch check -c 12 -f c12/pro-2 PRO-3     # what switch would do
 sz-branch switch -c 12 -f c12/pro-2 PRO-3    # create c12/pro-3 from c12/pro-2
 ```
+
+## Splitting a ticket
+
+`/sz-split` is for when the branch you are on grew too big: something else
+turned up, or the ticket was scoped too wide. It reads the uncommitted
+changes and the Linear ticket and proposes sub-issues as a tree, in the
+order to work on them, with each one's title, description and files:
+
+- **parallel**: independent sub-issues, each branched from this ticket's
+  branch and merged back into it;
+- **stacked**: a chain, each blocked by the one before and branched from
+  its branch;
+- **hybrid**: a mix.
+
+You rename, merge, move files and reorder until the split is right. After
+you approve, it creates the sub-issues under the current ticket (same team,
+project and cycle), sets the blockers, and comments on the current ticket
+why it was split. It touches no code: start each sub-issue with
+`/sz-work`, which carries the uncommitted changes along, and commit its
+files there.
+
+It asks whether you want a context file, `<ticket>-split.md`: why it was
+split, the order and status of each sub-issue, and the context each one
+needs, so a later session can pick it up cold. It goes in a gitignored
+plans or notes folder (`plans/`, `context-notes/`, ...); if the repo has
+none, it asks where. `/sz-work` shows a sub-issue's section when you start
+it, and `/sz-work` and `/sz-pr` keep its Status column current.
 
 ## Pull requests
 

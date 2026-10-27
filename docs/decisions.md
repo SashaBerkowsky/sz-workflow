@@ -338,3 +338,43 @@
   `ask`: no prefix rule can tell a query from a mutation.
 - Tested only the read queries, against a PR with no review threads; the
   reply and comment posting is untested.
+
+## 2026-10-26 · /sz-split splits a ticket into sub-issues
+
+**Decided**
+- A new skill, `skills/sz-split/`, splits the current ticket's
+  uncommitted changes into Linear sub-issues: parallel (each branched from
+  the ticket's branch and merged back), stacked (each blocked by the one
+  before), or hybrid. It proposes a mode and a tree in the order to work
+  on them, iterates with the user, and after approval creates the
+  sub-issues under the current ticket (same team, project and cycle), sets
+  the blockers, and comments on the ticket why it was split.
+- It changes no code or git state. The changes stay uncommitted; `/sz-work`
+  branches each sub-issue from the right place and `git switch` carries
+  them along, so each sub-issue's files are committed on its own branch.
+  Commits already on the branch stay with the current ticket: moving them
+  would mean rewriting history.
+- Optional context file, `<ticket>-split.md`, asked about before it is
+  written: why it was split, an Order table (blockers, branch base,
+  status), shared context and one section per sub-issue. It goes in a
+  gitignored plans or notes folder, found with `git check-ignore`; with
+  none, the user picks the path and is warned if it isn't ignored. It is
+  never overwritten. It names every sub-issue id, so `/sz-pr`'s notes
+  search already finds it.
+- `/sz-work` now shows a sub-issue's section of that file when starting it,
+  and `/sz-work` and `/sz-pr` update its Status cell when they move the
+  ticket, so the file stays current without a skill of its own.
+- `/sz-work` and `/sz-pr` take the blocker, not the parent, as the base of
+  a ticket that has both: in a stack, the blocker's branch already holds
+  the parent's changes. A ticket blocked by several asks.
+
+**Why**
+- Branches outgrow their ticket, through work found along the way or a
+  ticket scoped too wide, and the reason for a split was lost between
+  sessions.
+
+**Redo on migration**
+- Uses the Linear MCP server's `save_issue` (`parentId`, `blockedBy`,
+  `cycle`, `project`, `assignee`) and `save_comment`.
+- `disable-model-invocation` is Claude Code only.
+- Not tested against Linear: no ticket has been split yet.

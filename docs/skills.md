@@ -14,6 +14,7 @@ yes.
 - [sz-commit](#sz-commit): group changes into commits
 - [sz-work](#sz-work): get onto a Linear ticket's branch
 - [sz-new](#sz-new): turn a bug you saw into a Linear ticket
+- [sz-split](#sz-split): split a big branch's ticket into sub-issues
 - [sz-pr](#sz-pr): open a PR for the current ticket's branch
 - [sz-adjust](#sz-adjust): answer a PR's review, list the changes asked for
 
@@ -51,6 +52,9 @@ Linear MCP server.
 **Stops for you**: where to branch from when it's unclear, recording a new
 dependency in Linear, moving the ticket to In Progress.
 
+It also shows a sub-issue's section of a `/sz-split` context file when you
+start it, and keeps the file's Status column current.
+
 ## sz-new
 
 **What it's for**: turns a problem you saw into a Linear ticket someone
@@ -64,6 +68,29 @@ facts from the code or error you point to and checks for duplicates first.
 
 **Stops for you**: which template when several fit, the exact draft before
 it is created, and whether to start on it.
+
+## sz-split
+
+**What it's for**: splits the current ticket's uncommitted changes into
+Linear sub-issues, parallel, stacked or a mix, shown as a tree in the
+order to work on them. After approval it creates them with their
+blockers, comments on the current ticket why it was split, and optionally
+writes a context file.
+
+**Why it exists**: branches grow past their ticket, either because
+something turned up along the way or because the ticket was scoped too
+wide, and splitting by hand loses the context of why. The context file
+keeps that context, with the order and status of each sub-issue, in a
+gitignored folder, so a later session picks up any sub-issue cold. It
+changes no code or git state: `/sz-work` carries the uncommitted changes
+to each sub-issue's branch.
+
+**Calls**: `sz-commit config`, `scope-of`; the Linear MCP server.
+
+**Stops for you**: which ticket, if the branch has none; every round of
+the split; the exact sub-issues, blockers and comment before anything is
+created; whether to assign them and write the context file; and where to
+save it when the repo has no ignored plans folder.
 
 ## sz-pr
 
