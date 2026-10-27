@@ -56,7 +56,9 @@ for step 4, and the ticket's URL for step 6.
 
 The PR merges into the branch the work was built on:
 
-- The ticket is blocked by, or is a sub-issue of, ticket D: find D's branch
+- The ticket is blocked by, or is a sub-issue of, ticket D (when it is
+  both, as a stacked sub-issue from `/sz-split` is, D is the blocker; when
+  several tickets block it, ask which branch it was built on): find D's branch
   with `sz-branch find D` and its PR with
   `gh pr list --head <D's branch> --state all --json number,state,baseRefName`.
   - D's PR is open: the base is D's branch (a stacked PR). Say that it
@@ -226,6 +228,8 @@ has a ticket:
 2. Otherwise move it to the team's In Review status with the Linear MCP
    server. If the team has no status of that name, don't pick another one;
    say so in the report.
+3. If a notes file from step 4 has an Order table listing the ticket (a
+   `/sz-split` context file), update its Status cell to match.
 
 For a draft PR, leave the ticket as it is.
 
