@@ -50,6 +50,12 @@ prefix.
 Show the user one short summary: id, title, status, cycle, and what it
 depends on (blocked by, parent).
 
+If the ticket was split off another one (`/sz-split`), its context file
+holds what a cold start needs. Look for it the way `/sz-pr` step 4 looks
+for notes: files in plan or note folders, tracked or gitignored, that
+mention the ticket. If one has a `## <ticket> · ...` section, show it with
+the file's "Shared context", and keep its path for step 6.
+
 ## 3. Decide where to branch from
 
 Run `sz-branch find TARGET` first. If the target already has a branch,
@@ -65,6 +71,11 @@ Otherwise, pick the case that matches:
 | Nothing | `main` or a non-ticket branch | Branch from here. No question. |
 
 If D has no branch at all, say so and ask where to branch from.
+
+When the target has both a blocker and a parent (a stacked sub-issue from
+`/sz-split`), D is the blocker: its branch already holds the parent's
+changes. When it is blocked by several tickets, ask: it can only start
+once they are merged into a shared branch, usually the parent's.
 
 ## 4. Switch
 
@@ -103,7 +114,9 @@ text to add by hand.
 ## 6. Status
 
 Offer once: "Move TARGET to In Progress and assign it to you in Linear?"
-Change only what the user agrees to.
+Change only what the user agrees to. If step 2 found a context file that
+lists TARGET in its Order table, update its Status cell to match, as part
+of the same yes.
 
 ## 7. Report
 
