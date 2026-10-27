@@ -117,7 +117,17 @@ lists each commit with its files as a tree. Under each commit in the tree,
 add one short line in your own words on what that commit introduces (for a
 reader skimming the tree, not a repeat of the subject). This line is your
 own annotation on top of the script's output, never part of the commit
-message itself.
+message itself. Never skip this step or replace it with a prose description
+of the commits; the user reviews the actual tree, not a summary of it.
+
+```
+7b514c0 fix(api): reject unsigned webhooks
+├── services
+│   └── api
+│       ├── webhook.ts
+│       └── webhook.test.ts
+  rejects requests whose signature doesn't match, instead of processing them
+```
 
 End with "Not committed:" listing any changed files left out and why, or
 "none".
