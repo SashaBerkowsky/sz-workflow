@@ -95,7 +95,7 @@ save it when the repo has no ignored plans folder.
 ## sz-pr
 
 **What it's for**: drafts a PR for the current branch (title in the commit
-standard, description from the repo's PR template, the ticket and any
+standard with the ticket in front of the subject, description from the repo's PR template, the ticket and any
 notes) and pushes and opens it after approval; then moves the ticket to In
 Review.
 

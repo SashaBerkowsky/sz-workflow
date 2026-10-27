@@ -378,3 +378,22 @@
   `cycle`, `project`, `assignee`) and `save_comment`.
 - `disable-model-invocation` is Claude Code only.
 - Not tested against Linear: no ticket has been split yet.
+
+## 2026-10-26 · Ticket in the PR title
+
+**Decided**
+- `/sz-pr` titles are `type(scope): TICKET subject`, e.g.
+  `feat(pr): SZA-6 add a skill that opens a PR`: the ticket in upper case,
+  bare, in front of the subject. With no ticket it is left out. The
+  header max from `sz-commit config` includes the ticket.
+- Commits keep the ticket in the `Refs:` trailer only, and the description
+  keeps its `Refs:` link.
+
+**Why**
+- The owner's choice: the ticket shows in PR lists and notifications
+  without opening the PR. The id in the title also lets Linear's GitHub
+  integration link the PR when the branch name doesn't carry it.
+
+**Redo on migration**
+- Nothing tool-specific: the format is in the skill's wording only, like
+  the rest of the title rules.

@@ -242,7 +242,9 @@ logged in.
 - **Base:** the branch the work was built on. If the ticket depends on
   another ticket whose PR is still open, the PR is stacked on that branch;
   otherwise it targets the default branch.
-- **Title:** `type(scope): subject`, like the commits. The scope comes from
+- **Title:** `type(scope): TICKET subject`, like the commits with the
+  ticket in front of the subject (`feat(pr): SZA-6 add a skill that opens
+  a PR`), or without it when there is no ticket. The scope comes from
   `sz-commit scope-of` when the files share one; otherwise the skill picks
   one and says why.
 - **Description:** follows the repo's PR template if there is one
